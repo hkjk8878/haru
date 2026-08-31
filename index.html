@@ -153,10 +153,12 @@ input,select,textarea{font:inherit;color:inherit}
 .wkr i.miss{background:var(--cell2)}
 .wkr i.off{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .wkr i.fu{background:var(--cell)}
+.wkr i.sch{background:transparent;box-shadow:inset 0 0 0 1.5px var(--habit)}
 .wkl{display:flex;align-items:center;gap:5px;padding:2px 16px 14px;font-size:11px;color:var(--muted)}
 .wkl i{width:12px;height:12px;border-radius:4px;display:inline-block;background:var(--cell)}
 .wkl i.miss{background:var(--cell2)}
 .wkl i.off{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.wkl i.sch{background:transparent;box-shadow:inset 0 0 0 1.5px var(--habit)}
 .gcal{padding:6px 14px 10px}
 .gch{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px}
 .gch span{text-align:center;font-size:10.5px;color:var(--muted)}
@@ -234,10 +236,12 @@ input,select,textarea{font:inherit;color:inherit}
   font-size:9px;display:grid;place-items:center}
 .mvs button:disabled{opacity:.28}
 .week{display:flex;gap:3px;flex:none}
-.week i{width:14px;height:21px;border-radius:5px;background:var(--cell);display:grid;
-  place-items:center;font-size:9px;color:var(--muted);font-style:normal}
+.week i{width:15px;height:21px;border-radius:5px;background:var(--cell);display:grid;
+  place-items:center;font-size:9px;color:#5B6273;font-style:normal;font-weight:650}
 .week i.on{background:var(--habit);color:var(--onAccent)}
-.week i.miss{background:var(--cell2)}
+.week i.sch{background:transparent;box-shadow:inset 0 0 0 1.5px var(--habit);color:var(--habit)}
+.week i.miss{background:var(--cell2);color:var(--muted)}
+.week i.no{opacity:.4}
 
 .seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:4px;
   box-shadow:var(--shadow);margin-top:14px}
@@ -1486,10 +1490,11 @@ function vRoutine(){
 }
 function mgmtRow(h,i,arr){
   const c=catOf(h.catId), st=streak(h), g=grpOf(h.groupId);
-  const last7=Array.from({length:7},(_,x)=>addDays(today(),x-6));
-  const grid=last7.map(d=>{
+  const wk=Array.from({length:7},(_,x)=>addDays(monStart(today()),x));
+  const grid=wk.map(d=>{
     const sch=habDays(h).includes(dow(d)), dn=isDone(d,h.id);
-    return `<i class="${dn?'on':(sch&&d!==today()?'miss':'')}">${DAYS[dow(d)]}</i>`;
+    const cls=dn?'on':(!sch?'no':(d<today()?'miss':'sch'));
+    return `<i class="${cls}">${DAYS[dow(d)]}</i>`;
   }).join('');
   const many=Array.isArray(arr)&&arr.length>1;
   return `<div class="mrow" style="border-left-color:${c.color}">
@@ -1796,13 +1801,13 @@ function statWeek(){
           return `<div class="wkr"><span>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</span>${week.map(d=>{
             const sch=habDays(h).includes(dow(d));
             const dn=isDone(d,h.id);
-            const cls=dn?'on':(!sch?'off':(d>t?'fu':'miss'));
+            const cls=dn?'on':(!sch?'off':(d>t?'sch':'miss'));
             return `<i class="${cls}" style="${dn?`background:${c.color}`:''}"></i>`;
           }).join('')}</div>`;
         }).join(''):'<div class="empty">습관을 추가하면 여기에 표가 생겨요.</div>'}
       </div>
       <div class="wkl">지킴 <i class="on" style="background:var(--habit)"></i>
-        쉼 <i class="miss"></i> 그 요일 없음 <i class="off"></i></div>
+        예정 <i class="sch"></i> 쉼 <i class="miss"></i> 없는 요일 <i class="off"></i></div>
     </div>
     <div class="card"><header><h2>분류별</h2><span class="count">이번 주</span></header>
       <div style="padding:6px 0 14px">${catRows()}</div></div>`;
