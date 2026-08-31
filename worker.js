@@ -134,6 +134,36 @@ function dueAlarms(rec) {
   return out;
 }
 
+/* ── 알림 발송 본체 ── */
+async function runAlarms(env) {
+  if (!env.HARU || !env.VAPID_JWK) return { sent: 0, note: '설정 미완료' };
+  let sent = 0, checked = 0, cursor;
+  do {
+    const list = await env.HARU.list({ prefix: 'sub:', cursor });
+    cursor = list.list_complete ? null : list.cursor;
+    for (const k of list.keys) {
+      const raw = await env.HARU.get(k.name);
+      if (!raw) continue;
+      let rec;
+      try { rec = JSON.parse(raw); } catch (e) { continue; }
+      checked++;
+      const due = dueAlarms(rec);
+      for (const a of due) {
+        try {
+          const status = await push(env, rec.sub, {
+            title: a.title || '하루',
+            body: a.body || '',
+            tag: (a.k || 'haru') + ':' + Date.now()
+          });
+          if (status >= 200 && status < 300) sent++;
+          if (status === 404 || status === 410) await env.HARU.delete(k.name);
+        } catch (e) { /* 한 건 실패해도 나머지는 계속 */ }
+      }
+    }
+  } while (cursor);
+  return { sent, checked };
+}
+
 /* ── 라우팅 ── */
 export default {
   async fetch(req, env) {
@@ -152,6 +182,12 @@ export default {
           저장소KV: !!env.HARU
         }
       }, ok ? 200 : 500);
+    }
+
+    if (url.pathname === '/tick') {
+      const r = await runAlarms(env);
+      const t = localParts(-540);
+      return json({ ok: true, 지금: t.hm, 보낸알림: r.sent, 등록기기: r.checked });
     }
 
     if (url.pathname === '/key') {
@@ -199,30 +235,8 @@ export default {
     return json({ error: '없는 주소' }, 404);
   },
 
-  /* ── 매분 실행 ── */
+  /* ── 매분 실행 (Cron 또는 /tick 호출) ── */
   async scheduled(event, env, ctx) {
-    if (!env.HARU || !env.VAPID_JWK) return;
-    let cursor;
-    do {
-      const list = await env.HARU.list({ prefix: 'sub:', cursor });
-      cursor = list.list_complete ? null : list.cursor;
-      for (const k of list.keys) {
-        const raw = await env.HARU.get(k.name);
-        if (!raw) continue;
-        let rec;
-        try { rec = JSON.parse(raw); } catch (e) { continue; }
-        const due = dueAlarms(rec);
-        for (const a of due) {
-          try {
-            const status = await push(env, rec.sub, {
-              title: a.title || '하루',
-              body: a.body || '',
-              tag: (a.k || 'haru') + ':' + Date.now()
-            });
-            if (status === 404 || status === 410) await env.HARU.delete(k.name);
-          } catch (e) { /* 한 건 실패해도 나머지는 계속 */ }
-        }
-      }
-    } while (cursor);
+    await runAlarms(env);
   }
 };
