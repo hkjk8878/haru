@@ -45,6 +45,24 @@ input,select,textarea{font:inherit;color:inherit}
 .pill{margin-left:auto;font-size:12px;font-weight:650;color:var(--plan);
   background:var(--plan-soft);padding:7px 11px;border-radius:999px;flex:none}
 .pill.g{color:var(--goal);background:var(--goal-soft)}
+.moderow{display:flex;align-items:center;gap:9px;padding:12px 16px;border-top:1px solid var(--line)}
+.moderow.on{background:var(--goal-soft)}
+.moderow .mi{flex:1;min-width:0}
+.moderow .mi b{display:block;font-size:14.5px;font-weight:700}
+.moderow .mi b u{text-decoration:none;font-size:10px;font-weight:750;padding:2px 6px;border-radius:5px;
+  background:var(--cell2);color:var(--muted);vertical-align:2px}
+.moderow .mi b s{text-decoration:none;font-size:10px;font-weight:750;padding:2px 6px;border-radius:5px;
+  background:var(--goal);color:var(--onAccent);vertical-align:2px}
+.moderow .mi small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.moderow .mact{flex:none;font-size:12px;font-weight:700;color:var(--onAccent);background:var(--habit);
+  padding:8px 12px;border-radius:999px}
+.moderow .medit{flex:none;font-size:12px;font-weight:650;color:var(--muted);background:var(--card2);
+  padding:8px 11px;border-radius:999px}
+.modebar{display:flex;align-items:center;gap:10px;width:100%;margin-top:14px;padding:12px 14px;
+  border-radius:16px;background:var(--goal-soft);box-shadow:var(--shadow)}
+.modebar .mb{flex:1;font-size:13px;color:var(--goal)}
+.modebar .mb b{font-size:14.5px;font-weight:750}
+.modebar .ms{flex:none;font-size:11px;color:var(--goal);opacity:.8}
 .yearbar{display:block;width:100%;background:var(--card);border-radius:16px;padding:12px 14px 13px;
   box-shadow:var(--shadow);margin-top:14px}
 .yearbar .yl{display:block;font-size:13.5px;color:var(--muted)}
@@ -371,7 +389,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:rgba(15,17,22,.92);
   padding:7px 0 calc(7px + env(safe-area-inset-bottom));z-index:20}
 nav .inner{max-width:520px;margin:0 auto;display:flex}
 nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;
-  font-size:11px;font-weight:600;color:var(--muted);text-align:center}
+  font-size:10px;font-weight:600;color:var(--muted);text-align:center;min-width:0}
 nav button u{text-decoration:none;font-size:16px;line-height:1}
 nav button.on{color:var(--ink)}
 
@@ -559,7 +577,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:12,
+    version:15,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type])=>({id,name,color,type})),
@@ -593,7 +611,7 @@ function seed(){
     notify:{on:false,fired:{}},
     push:{url:'',id:'',on:false,at:'',err:''},
     sync:{room:'',on:false,rev:0,at:''},
-    lines:[], lineMode:'both', collapsed:{}, homeView:'card',
+    lines:[], lineMode:'both', collapsed:{}, homeView:'card', modes:[], activeModeId:'', modeOverride:null,
     logs:{}, seeded:true
   };
 }
@@ -632,6 +650,14 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<15){ d.modeOverride=null; d.version=15; }
+  if(d.version<14){ d.activeModeId=''; d.version=14; }
+  if(d.version<13){
+    d.modes=[];
+    (d.groups||[]).forEach(g=>{g.mode=g.mode||''});
+    (d.habits||[]).forEach(h=>{h.mode=h.mode||''});
+    d.version=13;
+  }
   if(d.version<12){
     const by={};
     (d.habits||[]).forEach(h=>{ const k=h.groupId||'__solo';
@@ -647,7 +673,9 @@ function migrate(d){
   d.logs||={}; d.notify||={on:false,fired:{}}; d.notify.fired||={};
   d.push||={url:'',id:'',on:false,at:'',err:''};
   d.sync||={room:'',on:false,rev:0,at:''};
-  d.lines||=[]; d.lineMode||='both'; d.collapsed||={}; d.homeView||='card';
+  d.lines||=[]; d.lineMode||='both'; d.modes||=[];
+  if(typeof d.activeModeId!=='string') d.activeModeId='';
+  if(d.modeOverride===undefined) d.modeOverride=null; d.collapsed||={}; d.homeView||='card';
   return d;
 }
 /* 저장소: 클로드 저장소 → 브라우저 저장소 → 메모리 순으로 자동 선택 */
@@ -770,16 +798,36 @@ const mcatOf=id=>S.mcats.find(c=>c.id===id)||{...NOCAT,type:'out'};
 const grpOf=id=>S.groups.find(g=>g.id===id);
 const habDays=h=>h.days||((grpOf(h.groupId)||{days:[0,1,2,3,4,5,6]}).days);
 const alive=h=>!h.groupId||!!grpOf(h.groupId);
-const habitsOn=d=>S.habits.filter(h=>alive(h)&&habDays(h).includes(dow(d)));
-const soloOn=d=>S.habits.filter(h=>!h.groupId&&habDays(h).includes(dow(d)))
+const habitsOn=d=>S.habits.filter(h=>alive(h)&&habDays(h).includes(dow(d))&&inMode(modeOf(h),d));
+const soloOn=d=>S.habits.filter(h=>!h.groupId&&habDays(h).includes(dow(d))&&inMode(h.mode||'',d))
   .sort((a,b)=>{
     const t=((a.time||'99:99')<(b.time||'99:99'))?-1:((a.time||'99:99')>(b.time||'99:99')?1:0);
     return t||byOrd(a,b);
   });
 const byOrd=(a,b)=>(a.ord||0)-(b.ord||0);
+function activeMode(d){
+  const ov=S.modeOverride;
+  if(ov&&ov.date===d)
+    return ov.id?((S.modes||[]).find(m=>m.id===ov.id)||null):null;
+  const ms=(S.modes||[]).filter(m=>m.from&&m.to&&d>=m.from&&d<=m.to)
+    .sort((a,b)=>a.from<b.from?-1:1);
+  if(ms.length) return ms[ms.length-1];
+  const id=S.activeModeId||'';
+  return id?((S.modes||[]).find(m=>m.id===id)||null):null;
+}
+const modeReserved=d=>(S.modes||[]).some(m=>m.from&&m.to&&d>=m.from&&d<=m.to);
+function inMode(mv,d){
+  const am=activeMode(d);
+  mv=mv||'';
+  if(!am) return mv==='';
+  if(mv===am.id) return true;
+  return !!am.base&&mv==='';
+}
+const modeOf=h=>h.mode||((grpOf(h.groupId)||{}).mode||'');
 const habitsOfGroup=gid=>S.habits.filter(h=>h.groupId===gid).sort(byOrd);
-const habitsOfGroupOn=(gid,d)=>habitsOfGroup(gid).filter(h=>habDays(h).includes(dow(d)));
-const groupsOn=d=>S.groups.filter(g=>habitsOfGroupOn(g.id,d).length)
+const habitsOfGroupOn=(gid,d)=>habitsOfGroup(gid)
+  .filter(h=>habDays(h).includes(dow(d))&&inMode(modeOf(h),d));
+const groupsOn=d=>S.groups.filter(g=>inMode(g.mode,d)&&habitsOfGroupOn(g.id,d).length)
   .sort((a,b)=>(a.time||'99')<(b.time||'99')?-1:1);
 const isRepeat=e=>!!(e.repeatDays&&e.repeatDays.length);
 const evSpan=e=>(!isRepeat(e)&&e.date&&e.endDate)?diffDays(e.date,e.endDate)+1:1;
@@ -818,6 +866,7 @@ function alarmsFor(d){
   const out=[];
   S.groups.forEach(g=>{
     if(!g.notify||!g.time||!g.days.includes(dow(d))) return;
+    if(!inMode(g.mode,d)) return;
     const hs=habitsOfGroupOn(g.id,d); if(!hs.length) return;
     out.push({key:'g'+g.id,at:toMin(g.time)-+g.notify,title:g.name+' 시간이에요',
       body:hs.map(h=>h.name).join(', '),label:g.name,kind:'루틴'});
@@ -825,6 +874,7 @@ function alarmsFor(d){
   S.habits.forEach(h=>{
     if(!h.time||!h.notify||!alive(h)) return;
     if(!habDays(h).includes(dow(d))) return;
+    if(!inMode(modeOf(h),d)) return;
     out.push({key:'h'+h.id,at:toMin(h.time)-+h.notify,title:h.name+' 시간이에요',
       body:h.min?h.min+'분 예정':'',label:h.name,kind:'습관'});
   });
@@ -1175,9 +1225,10 @@ async function pushOff(){
 /* ══════════ 렌더 ══════════ */
 function render(){
   $('#app').innerHTML= tab==='today'?vToday():tab==='routine'?vRoutine()
-    :tab==='cal'?vCal():tab==='money'?vMoney():vStat();
+    :tab==='cal'?vCal():tab==='money'?vMoney():tab==='set'?vSet():vStat();
   $('#nav').innerHTML=`<div class="inner">${[
-    ['today','◴','오늘'],['routine','◇','루틴'],['cal','▤','달력'],['money','₩','가계부'],['stat','◗','통계']
+    ['today','◴','오늘'],['routine','◇','루틴'],['cal','▤','달력'],
+    ['money','₩','가계부'],['stat','◗','통계'],['set','⚙','설정']
   ].map(([k,i,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><u>${i}</u>${l}</button>`).join('')}</div>`;
   if(focusTodo){focusTodo=false;const el=$('#todoInput');if(el)el.focus()}
 }
@@ -1279,7 +1330,13 @@ function vToday(){
               ['todo','할 일',td.length?`${tdd}/${td.length}`:''],
               ['event','일정',evs.length?String(evs.length):''],
               ['money','지출',out?Math.round(out/1000)+'천':'']];
-  return header()+ddayStrip()+
+  const am=activeMode(view);
+  return header()+
+    (am?`<button class="modebar" data-tab="routine">
+      <span class="mb"><b>${esc(am.name)}</b> ${am.from?md(am.from)+'–'+md(am.to):(am.base?'기본 루틴도 함께':'이 모드 루틴만')}</span>
+      <span class="ms">${(S.modeOverride&&S.modeOverride.date===view)?'직접 적용'
+        :modeReserved(view)?'예약':'적용중'}</span></button>`:'')+
+    ddayStrip()+
     (S.notify.on&&nextA?`<div class="card"><div class="alarmrow" style="border-top:none">
       <span class="t" style="color:var(--habit)">${toTime(nextA.at)}</span>
       <span class="n">다음 알림 · ${esc(nextA.label)}</span>
@@ -1446,7 +1503,7 @@ function vRoutine(){
   }
   const st=notifState(), al=alarmsFor(today()), nm=nowMin();
   return `<div class="top"><div class="datenav"><div><h1>루틴</h1>
-      <p class="sub" style="display:block">여기서 만들고 고칩니다. 체크는 오늘 화면에서.</p></div>
+      <p class="sub" style="display:block">여기서 만들고 고칩니다. 알림은 설정 탭에서.</p></div>
       <button class="pill h" data-addsheet="1">＋ 추가</button></div>
     <div class="seg">
       <button data-rmode="group" class="${routineMode==='group'?'on':''}">묶음별</button>
@@ -1457,35 +1514,32 @@ function vRoutine(){
         <button class="add" style="color:var(--habit)" data-newsolo="1">＋ 추가</button></header>
         <div style="margin-top:10px">${so.length?so.map(mgmtRow).join('')
           :'<div class="empty">묶음 없이 하나만 반복하는 습관을 여기에 만들 수 있어요.</div>'}</div></div>`;})()}
-    <div class="card"><header><h2>습관 분류</h2><button class="add" data-newcat="1">＋ 분류</button></header>
-      <div class="empty" style="padding-bottom:10px">이름을 눌러 수정하거나 삭제할 수 있어요.</div>
-      <div style="padding:0 16px 16px" class="picks">${S.cats.map(c=>
-        `<button data-editcat="${c.id}"><i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
-        ||'<span style="font-size:13px;color:var(--muted)">분류가 없어요.</span>'}</div></div>
-    <div class="card"><header><h2>알림</h2>
-      <button class="add" data-togglenotify="1" style="color:${S.notify.on?'var(--habit)':'var(--muted)'}">
-        ${S.notify.on?'켜짐':'꺼짐'}</button></header>
-      <div class="empty" style="padding-bottom:8px">
-        이 알림은 <b>이 화면이 열려 있는 동안만</b> 울려요. 화면을 닫아도 울리게 하려면 달력 탭에서 폰 캘린더로 내보내세요.
-        ${st==='unsupported'?' 지금 환경에서는 시스템 알림이 막혀 있어 앱 안 배너로만 뜹니다.':''}
-      </div>
-      ${S.notify.on?(al.length?al.map(a=>`<div class="alarmrow ${a.at<nm?'past':''}">
-        <span class="t">${toTime(a.at)}</span><span class="n">${esc(a.label)}</span>
-        <span class="s">${a.kind}</span></div>`).join('')
-        :'<div class="empty">오늘 예정된 알림이 없어요.</div>')
-        :`<button class="addbtn" style="color:var(--habit)" data-togglenotify="1">알림 켜기</button>`}
+    <div class="card"><header><h2>루틴 모드</h2>
+      <span class="count">${1+(S.modes||[]).length}개</span></header>
+      <div class="empty" style="padding-bottom:8px">상황별로 루틴 묶음을 저장해 두고 전환해서 씁니다.
+        날짜를 예약해 두면 그 기간에 저절로 바뀌어요.</div>
+      ${(()=>{
+        const cur=activeMode(today());
+        const rows=[{id:'',name:'데일리 모드',base:true,def:true,from:'',to:''}].concat((S.modes||[]).slice());
+        return rows.map(m=>{
+          const on=cur?cur.id===m.id:m.id==='';
+          const cnt=m.id===''
+            ? S.groups.filter(g=>!g.mode).length+S.habits.filter(h=>!h.mode&&!h.groupId).length
+            : S.groups.filter(g=>g.mode===m.id).length+S.habits.filter(h=>h.mode===m.id).length;
+          return `<div class="moderow ${on?'on':''}">
+            <span class="mi">
+              <b>${esc(m.name)}${m.def?' <u>기본</u>':''}${on?' <s>적용중</s>':''}</b>
+              <small>루틴 ${cnt}개${m.from?` · 예약 ${md(m.from)}–${md(m.to)}`:''}${(!m.def&&!m.base)?' · 이 모드만':''}</small></span>
+            ${on?'':`<button class="mact" data-usemode="${m.id}">적용</button>`}
+            ${m.def?'':`<button class="medit" data-editmode="${m.id}">설정</button>`}
+          </div>`;
+        }).join('');
+      })()}
+      ${(S.modeOverride&&S.modeOverride.date===today())
+        ?'<div class="empty" style="padding:10px 16px 0;font-size:12px">오늘은 직접 고른 모드가 예약보다 우선 적용됩니다.</div>':''}
+      <button class="addbtn" style="color:var(--goal)" data-newmode="1">＋ 새 모드 추가하기</button>
     </div>
-    <div class="card"><header><h2>폰 알림 (앱을 닫아도 옴)</h2>
-      <span class="count">${S.push.on?'켜짐':'꺼짐'}</span></header>
-      <div class="empty" style="padding-bottom:8px">
-        ${S.push.on?`알림 서버에 연결됐어요. 루틴·일정·목표를 바꾸면 자동으로 서버에 다시 알려줍니다.
-          ${S.push.at?'마지막 동기화 '+S.push.at:''}`
-        :S.push.err?`<b style="color:var(--task)">연결 실패: ${esc(S.push.err)}</b><br>설정에서 다시 시도해 보세요.`
-        :'알림 서버를 한 번 연결해 두면, 이 앱을 완전히 닫아도 정해진 시각에 아이폰이 알려줍니다. 설치 문서의 3~7단계를 먼저 하세요.'}
-      </div>
-      <button class="addbtn" style="color:var(--habit)" data-pushsheet="1">
-        ${S.push.on?'폰 알림 설정 ›':'＋ 폰 알림 연결하기'}</button>
-    </div>
+
     `;
 }
 function mgmtRow(h,i,arr){
@@ -1563,11 +1617,7 @@ function vCal(){
           <span style="font-size:12px;font-weight:700;color:${c.color};flex:none">${dd>0?'D-'+dd:dd===0?'D-DAY':'진행 중'}</span>
           <span class="chev">›</span></button>`;
       }).join('')}</div>`:''}
-    <div class="card"><header><h2>일정 분류</h2><button class="add" data-newecat="1">＋ 분류</button></header>
-      <div class="empty" style="padding-bottom:10px">일, 개인, 약속, 여행처럼 직접 만들고 지울 수 있어요.</div>
-      <div style="padding:0 16px 16px" class="picks">${S.ecats.map(c=>
-        `<button data-editecat="${c.id}"><i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
-        ||'<span style="font-size:13px;color:var(--muted)">분류가 없어요.</span>'}</div></div>
+
     <div class="card"><header><h2>캘린더로 내보내기</h2></header>
       <div class="empty" style="padding-bottom:8px">일정·기간·장소·루틴 시각·목표를 캘린더 파일로 넘기면,
         이 앱을 닫아도 폰이 알림을 울려 줍니다.
@@ -1660,17 +1710,7 @@ function vMoney(){
         return `<div class="daygrp"><span>${md(d)} ${DAYS[dow(d)]}</span>
           <span>${won(sum(rs.filter(r=>r.type==='out'),r=>r.amount))}</span></div>`+rs.map(txRow).join('');
       }).join(''):'<div class="empty">＋ 기록으로 첫 지출을 남겨 보세요.</div>'}</div></div>
-    <div class="card"><header><h2>가계부 분류</h2>
-      <button class="add" data-newmcat="1" style="color:var(--goal)">＋ 분류</button></header>
-      <div class="empty" style="padding-bottom:6px">지출·수입 분류를 직접 만들고 지울 수 있어요.</div>
-      <div class="subhead">지출</div>
-      <div style="padding:8px 16px 0" class="picks">${S.mcats.filter(c=>c.type==='out').map(c=>
-        `<button data-editmcat="${c.id}"><i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
-        ||'<span style="font-size:13px;color:var(--muted)">없음</span>'}</div>
-      <div class="subhead">수입</div>
-      <div style="padding:8px 16px 16px" class="picks">${S.mcats.filter(c=>c.type==='in').map(c=>
-        `<button data-editmcat="${c.id}"><i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
-        ||'<span style="font-size:13px;color:var(--muted)">없음</span>'}</div></div>`;
+`;
 }
 
 function yearCard(){
@@ -1748,6 +1788,33 @@ function installCard(){
       ${(!IS_STANDALONE&&installEvt)?'<button class="addbtn" style="color:var(--habit)" data-install="1">앱으로 설치하기</button>':''}
     </div>`;
 }
+function notifyCard(){
+  const st=notifState(), al=alarmsFor(today()), nm=nowMin();
+  return `<div class="card"><header><h2>알림</h2>
+      <button class="add" data-togglenotify="1" style="color:${S.notify.on?'var(--habit)':'var(--muted)'}">
+        ${S.notify.on?'켜짐':'꺼짐'}</button></header>
+      <div class="empty" style="padding-bottom:8px">
+        이 알림은 <b>이 화면이 열려 있는 동안만</b> 울려요. 화면을 닫아도 울리게 하려면 달력 탭에서 폰 캘린더로 내보내세요.
+        ${st==='unsupported'?' 지금 환경에서는 시스템 알림이 막혀 있어 앱 안 배너로만 뜹니다.':''}
+      </div>
+      ${S.notify.on?(al.length?al.map(a=>`<div class="alarmrow ${a.at<nm?'past':''}">
+        <span class="t">${toTime(a.at)}</span><span class="n">${esc(a.label)}</span>
+        <span class="s">${a.kind}</span></div>`).join('')
+        :'<div class="empty">오늘 예정된 알림이 없어요.</div>')
+        :`<button class="addbtn" style="color:var(--habit)" data-togglenotify="1">알림 켜기</button>`}
+    </div>
+    <div class="card"><header><h2>폰 알림 (앱을 닫아도 옴)</h2>
+      <span class="count">${S.push.on?'켜짐':'꺼짐'}</span></header>
+      <div class="empty" style="padding-bottom:8px">
+        ${S.push.on?`알림 서버에 연결됐어요. 루틴·일정·목표를 바꾸면 자동으로 서버에 다시 알려줍니다.
+          ${S.push.at?'마지막 동기화 '+S.push.at:''}`
+        :S.push.err?`<b style="color:var(--task)">연결 실패: ${esc(S.push.err)}</b><br>설정에서 다시 시도해 보세요.`
+        :'알림 서버를 한 번 연결해 두면, 이 앱을 완전히 닫아도 정해진 시각에 아이폰이 알려줍니다. 설치 문서의 3~7단계를 먼저 하세요.'}
+      </div>
+      <button class="addbtn" style="color:var(--habit)" data-pushsheet="1">
+        ${S.push.on?'폰 알림 설정 ›':'＋ 폰 알림 연결하기'}</button>
+    </div>`;
+}
 function vStat(){
   const t=today();
   return `<div class="top"><div class="datenav"><div><h1>통계</h1>
@@ -1763,7 +1830,12 @@ function vStat(){
       <textarea class="note" id="note" placeholder="오늘 어땠나요. 잘한 것 하나, 아쉬운 것 하나.">${esc(log(t).note||'')}</textarea>
       ${Object.keys(S.logs).filter(d=>(S.logs[d].note||'').trim()&&d!==t).sort().reverse().slice(0,5)
         .map(d=>`<div class="pastnote"><em>${md(d)}</em><p>${esc(S.logs[d].note)}</p></div>`).join('')}</div>`+
-    linesCard()+syncCard()+backupCard()+installCard();
+    '';
+}
+function vSet(){
+  return `<div class="top"><div class="datenav"><div><h1>설정</h1>
+    <p class="sub" style="display:block">알림, 동기화, 백업을 한자리에서.</p></div></div></div>`+
+    notifyCard()+syncCard()+backupCard()+linesCard()+installCard();
 }
 function statYMlabel(){
   const [y,m]=statYM.split('-').map(Number);
@@ -1966,6 +2038,7 @@ function habitStatRows(){
 
 /* ══════════ 시트 ══════════ */
 function openSheet(h){
+  sheetPick.catEdit=false; sheetPick.catEditId='';
   $('#sheet').innerHTML=h; $('#scrim').classList.add('open');
   requestAnimationFrame(()=>$('#sheet').classList.add('open'));
 }
@@ -1978,6 +2051,10 @@ function daysPicker(){
       <button type="button" data-quick="end">주말</button>
       <button type="button" data-quick="none">해제</button></div>`;
 }
+const modeSelect=v=>`<div class="field"><label for="f-mode">사용할 모드</label>
+  <select id="f-mode"><option value="" ${v?'':'selected'}>기본 (평소)</option>
+    ${(S.modes||[]).map(m=>`<option value="${m.id}" ${v===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}
+  </select>${(S.modes||[]).length?'':'<p style="margin:7px 0 0;font-size:12px;color:var(--muted)">모드를 만들면 여기서 고를 수 있어요.</p>'}</div>`;
 const notifySelect=(v,lab)=>`<div class="field"><label for="f-notify">${lab}</label>
   <select id="f-notify">${OFFS.map(([k,l])=>`<option value="${k}" ${String(v||'')===k?'selected':''}>${l}</option>`).join('')}</select></div>`;
 const syncDays=()=>document.querySelectorAll('[data-day]')
@@ -1986,6 +2063,52 @@ const focusIn=id=>setTimeout(()=>{const e=$(id);if(e)e.focus()},260);
 function showErr(m){const e=$('#err');if(e){e.textContent=m;e.classList.add('on')}}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900)}
+function catArr(kind){
+  return kind==='hab'?S.cats:kind==='ev'?S.ecats:S.mcats.filter(c=>c.type===moneyType);
+}
+function inlineNew(kind){
+  return `<div id="catNew" style="display:none;margin-top:8px;padding:11px;border-radius:12px;background:var(--card2)">
+    <p id="catNewTitle" style="margin:0 0 8px;font-size:12.5px;font-weight:650;color:var(--muted)">새 분류</p>
+    <input id="f-newcat" type="text" placeholder="분류 이름" maxlength="10"
+      style="width:100%;border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:9px 11px">
+    <div class="swatch" style="margin-top:8px">${PALETTE.map(pc=>
+      `<button type="button" data-newcolor="${pc}" style="background:${pc};width:28px;height:28px;border-radius:8px"></button>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="cancel" style="padding:11px 14px" data-catcancel="1">닫기</button>
+      <button id="catDel" class="del" style="display:none;padding:11px 14px" data-delcatinline="${kind}">삭제</button>
+      <button class="save" style="flex:1;padding:11px" data-addcat="${kind}">저장</button>
+    </div>
+  </div>`;
+}
+function chipsHTML(kind){
+  const arr=catArr(kind);
+  const key=kind==='hab'?'cat':kind==='ev'?'ecat':'mcat';
+  const attr=kind==='hab'?'pickcat':kind==='ev'?'pickecat':'pickm';
+  const ed=!!sheetPick.catEdit;
+  return arr.map(c=>ed
+    ? `<button type="button" data-editcatinline="${kind}:${c.id}" style="box-shadow:inset 0 0 0 1.5px var(--habit)">
+        <i style="background:${c.color}"></i>${esc(c.name)} ✎</button>`
+    : `<button type="button" data-${attr}="${c.id}" class="${sheetPick[key]===c.id?'on':''}">
+        <i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')+
+    `<button type="button" data-showcatnew="${kind}" style="font-weight:750">＋</button>
+     <button type="button" data-toggcatedit="${kind}" class="${ed?'on':''}">${ed?'완료':'✎'}</button>`;
+}
+function refreshChips(kind){
+  const box=$('#catPicks'); if(box) box.innerHTML=chipsHTML(kind);
+}
+function openCatBox(kind,id){
+  const b=$('#catNew'); if(!b) return;
+  const c=id?catArr(kind).find(x=>x.id===id):null;
+  sheetPick.catEditId=id||'';
+  sheetPick.newColor=c?c.color:PALETTE[0];
+  $('#catNewTitle').textContent=c?'분류 수정':'새 분류';
+  $('#f-newcat').value=c?c.name:'';
+  $('#catDel').style.display=c?'block':'none';
+  document.querySelectorAll('[data-newcolor]').forEach(x=>
+    x.classList.toggle('on',x.dataset.newcolor===sheetPick.newColor));
+  b.style.display='block';
+  $('#f-newcat').focus();
+}
 const swatch=sel=>`<div class="swatch">${PALETTE.map(p=>
   `<button type="button" data-color="${p}" class="${sel.toLowerCase()===p.toLowerCase()?'on':''}" style="background:${p}"></button>`).join('')}</div>
   <label class="pickown"><input type="color" id="f-color" value="${sel}">
@@ -1999,6 +2122,27 @@ function addSheet(){
     <button class="lvrow" data-newgrp="1"><b class="lvb plus">루틴</b>
       <span>습관 여러 개 묶음<br><small style="color:var(--muted);font-size:12px">예: 눈 뜨자마자, 자기 전</small></span></button>
     <div class="actions"><button class="cancel" style="flex:1;text-align:center" data-close="1">닫기</button></div>`);
+}
+function modeSheet(id){
+  const m=id?(S.modes||[]).find(x=>x.id===id):null;
+  openSheet(`<h2>${m?'모드 수정':'루틴 모드 만들기'}</h2>
+    <p class="hint">여행·시험기간처럼 평소와 다른 기간을 정해 두는 기능이에요.</p>
+    <p class="err" id="err"></p>
+    <div class="field"><label for="f-name">모드 이름</label>
+      <input id="f-name" type="text" value="${m?esc(m.name):''}" placeholder="여행 모드" maxlength="14"></div>
+    <div class="field"><label>날짜 예약 (비워두면 직접 전환해서 씁니다)</label>
+      <div class="row2"><div class="field" style="margin:0"><input id="f-from" type="date" value="${m?m.from||'':''}"></div>
+        <div class="field" style="margin:0"><input id="f-to" type="date" value="${m?m.to||'':''}"></div></div></div>
+    <div class="field"><label for="f-base">기존 루틴</label>
+      <select id="f-base">
+        <option value="0" ${m&&m.base?'':'selected'}>이 기간엔 이 모드 루틴만 보기</option>
+        <option value="1" ${m&&m.base?'selected':''}>기본 루틴도 함께 보기</option>
+      </select></div>
+    ${m?`<p class="hint">루틴이나 습관을 수정할 때 <b>사용할 모드</b>에서 이 모드를 고르면 이 기간에만 나옵니다.</p>`:''}
+    <div class="actions">${m?`<button class="del" data-delmode="${m.id}">삭제</button>`
+      :'<button class="cancel" data-close="1">취소</button>'}
+      <button class="save" data-savemode="${m?m.id:''}">저장</button></div>`);
+  focusIn('#f-name');
 }
 function addGrpSheet(gid){
   const g=grpOf(gid);
@@ -2107,6 +2251,7 @@ function grpSheet(id){
         <input id="f-min" type="number" min="0" step="5" value="${g&&g.min?g.min:''}" placeholder="15"></div></div>
     ${notifySelect(g?g.notify:'','알림 (시각이 있을 때만)')}
     <div class="field"><label>실천 요일</label>${daysPicker()}</div>
+    ${modeSelect(g?g.mode:'')}
     ${g?'<p class="hint" style="margin:0 0 2px">삭제해도 안에 있던 습관은 지워지지 않고 따로 하기로 옮겨집니다.</p>':''}
     <div class="actions">${g?`<button class="del" data-delgrp="${g.id}">삭제</button>`
       :'<button class="cancel" data-close="1">취소</button>'}
@@ -2126,10 +2271,8 @@ function habSheet(gid,id){
           style="text-align:center;font-size:20px"></div>
       <div class="field"><label for="f-name">무엇을 하나요</label>
         <input id="f-name" type="text" value="${h?esc(h.name):''}" placeholder="스트레칭 10분" maxlength="26"></div></div>
-    <div class="field"><label>분류</label><div class="picks">${S.cats.map(c=>
-      `<button type="button" data-pickcat="${c.id}" class="${sheetPick.cat===c.id?'on':''}">
-        <i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
-      ||'<span style="font-size:13px;color:var(--muted)">분류를 먼저 만들어 주세요</span>'}</div></div>
+    <div class="field"><label>분류</label><div class="picks" id="catPicks">${chipsHTML('hab')}</div>
+      ${inlineNew('hab')}</div>
     <div class="field"><label for="f-grp">어디에 넣을까요</label><select id="f-grp">
       <option value="" ${solo?'selected':''}>따로 하기 (묶음 없음)</option>
       ${S.groups.map(x=>`<option value="${x.id}" ${g&&x.id===g.id?'selected':''}>${esc(x.name)} 묶음</option>`).join('')}
@@ -2164,6 +2307,7 @@ function habSheet(gid,id){
       <input id="f-plus" type="text" value="${h?esc((h.lv||{}).plus||''):''}" placeholder="Plus — 집에서 홈트 15분" maxlength="30" style="margin-bottom:7px">
       <input id="f-max" type="text" value="${h?esc((h.lv||{}).max||''):''}" placeholder="Max — 헬스장 가기" maxlength="30">
       <p style="margin:7px 0 0;font-size:12px;color:var(--muted)">하나라도 적으면, 체크할 때 그날 컨디션에 맞는 단계를 고를 수 있어요.</p></div>
+    ${modeSelect(h?h.mode:'')}
     <div class="field"><label for="f-streak">연속 달성 표시</label>
       <select id="f-streak">
         <option value="1" ${(!h||h.streakOn!==false)?'selected':''}>보이기 (🔥 5)</option>
@@ -2183,10 +2327,8 @@ function evSheet(id){
     <p class="hint">여러 날 이어지는 일정은 종료 날짜를 다르게 두면 됩니다.</p><p class="err" id="err"></p>
     <div class="field"><label for="f-title">무엇을 하나요</label>
       <input id="f-title" type="text" value="${e?esc(e.title):''}" placeholder="팀 회의" maxlength="40"></div>
-    <div class="field"><label>분류</label><div class="picks">${S.ecats.map(c=>
-      `<button type="button" data-pickecat="${c.id}" class="${sheetPick.ecat===c.id?'on':''}">
-        <i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
-      ||'<span style="font-size:13px;color:var(--muted)">분류를 먼저 만들어 주세요</span>'}</div></div>
+    <div class="field"><label>분류</label><div class="picks" id="catPicks">${chipsHTML('ev')}</div>
+      ${inlineNew('ev')}</div>
     <div class="field"><label for="f-kind">시간</label>
       <select id="f-kind"><option value="time" ${allDay?'':'selected'}>시각 지정</option>
         <option value="all" ${allDay?'selected':''}>하루 종일</option></select></div>
@@ -2255,7 +2397,8 @@ function txSheet(id){
     <div class="field"><label for="f-amt">금액</label>
       <input class="amt" id="f-amt" type="number" inputmode="numeric" min="0" step="100"
         value="${m?m.amount:''}" placeholder="0"></div>
-    <div class="field"><label>분류</label><div class="picks" id="mcats">${mcatPicks()}</div></div>
+    <div class="field"><label>분류</label><div class="picks" id="catPicks">${chipsHTML('mn')}</div>
+      ${inlineNew('mn')}</div>
     <div class="field"><label for="f-memo">내용</label>
       <input id="f-memo" type="text" value="${m?esc(m.memo||''):''}" placeholder="점심, 지하철" maxlength="30"></div>
     <div class="field"><label for="f-date">날짜</label>
@@ -2343,7 +2486,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -2438,7 +2581,7 @@ document.addEventListener('click',ev=>{
     moneyType=d.mtype;
     const f=S.mcats.find(c=>c.type===moneyType); sheetPick.mcat=f?f.id:'';
     document.querySelectorAll('[data-mtype]').forEach(b=>b.classList.toggle('on',b.dataset.mtype===moneyType));
-    $('#mcats').innerHTML=mcatPicks(); return;
+    $('#catPicks').innerHTML=chipsHTML('mn'); return;
   }
   if(d.pickm){sheetPick.mcat=d.pickm;
     document.querySelectorAll('[data-pickm]').forEach(b=>b.classList.toggle('on',b.dataset.pickm===d.pickm));return}
@@ -2484,7 +2627,8 @@ document.addEventListener('click',ev=>{
     if(!sheetDays.length) return showErr('요일을 하나 이상 골라 주세요.');
     const time=$('#f-time').value||'', notify=$('#f-notify').value;
     if(notify&&!time) return showErr('알림을 쓰려면 시각을 정해 주세요.');
-    const o={name,time,notify,min:Math.max(0,+$('#f-min').value||0),days:sheetDays.slice().sort()};
+    const o={name,time,notify,min:Math.max(0,+$('#f-min').value||0),days:sheetDays.slice().sort(),
+      mode:$('#f-mode').value};
     if(d.savegrp) Object.assign(grpOf(d.savegrp),o); else S.groups.push({id:uid(),...o});
     save();closeSheet();render();toast('저장했어요');return;
   }
@@ -2502,6 +2646,7 @@ document.addEventListener('click',ev=>{
       time:$('#f-time2').value||'',
       min:Math.max(0,+$('#f-min').value||0),
       notify:$('#f-notify').value,
+      mode:$('#f-mode').value,
       track:$('#f-track').value,unit:$('#f-unit').value.trim(),streakOn:$('#f-streak').value==='1',
       lv:{mini:$('#f-mini').value.trim(),plus:$('#f-plus').value.trim(),max:$('#f-max').value.trim()}};
     if(d.savehab) Object.assign(S.habits.find(x=>x.id===d.savehab),o);
@@ -2592,6 +2737,89 @@ document.addEventListener('click',ev=>{
     const g=S.goals.find(x=>x.id===gi);g.steps=g.steps.filter(x=>x.id!==si);
     save();closeSheet();render();toast('삭제했어요');return}
   if(d.deltx){S.money=S.money.filter(x=>x.id!==d.deltx);save();closeSheet();render();toast('삭제했어요');return}
+  if(d.newmode){modeSheet(null);return}
+  if(d.editmode){modeSheet(d.editmode);return}
+  if(d.savemode!==undefined){
+    const name=$('#f-name').value.trim();
+    const from=$('#f-from').value, to=$('#f-to').value;
+    if(!name) return showErr('모드 이름을 적어 주세요.');
+    if((from&&!to)||(!from&&to)) return showErr('예약은 시작과 끝을 함께 정해 주세요.');
+    if(from&&to&&to<from) return showErr('끝 날짜가 시작보다 빠를 수 없어요.');
+    const o={name,from,to,base:$('#f-base').value==='1'};
+    S.modes||=[];
+    if(d.savemode) Object.assign(S.modes.find(x=>x.id===d.savemode),o);
+    else S.modes.push({id:uid(),...o});
+    save();closeSheet();render();toast('모드를 저장했어요');
+    return;
+  }
+  if(d.usemode!==undefined){
+    S.activeModeId=d.usemode||'';
+    S.modeOverride={date:today(),id:S.activeModeId};
+    save();render();
+    toast(S.activeModeId?'모드를 바꿨어요':'데일리 모드로 돌아왔어요');
+    return;
+  }
+  if(d.delmode){
+    S.modes=(S.modes||[]).filter(x=>x.id!==d.delmode);
+    S.groups.forEach(g=>{if(g.mode===d.delmode)g.mode=''});
+    S.habits.forEach(h=>{if(h.mode===d.delmode)h.mode=''});
+    if(S.activeModeId===d.delmode) S.activeModeId='';
+    save();closeSheet();render();toast('모드를 지웠어요. 루틴은 기본으로 돌아갑니다.');
+    return;
+  }
+  if(d.showcatnew){ openCatBox(d.showcatnew,''); return; }
+  if(d.toggcatedit){
+    sheetPick.catEdit=!sheetPick.catEdit;
+    refreshChips(d.toggcatedit);
+    const b=$('#catNew'); if(b) b.style.display='none';
+    return;
+  }
+  if(d.editcatinline){
+    const [kind,cid]=d.editcatinline.split(':');
+    openCatBox(kind,cid);
+    return;
+  }
+  if(d.catcancel){ const b=$('#catNew'); if(b) b.style.display='none'; return; }
+  if(d.delcatinline){
+    const kind=d.delcatinline, cid=sheetPick.catEditId;
+    if(cid){
+      if(kind==='hab'){ S.cats=S.cats.filter(c=>c.id!==cid); S.habits.forEach(h=>{if(h.catId===cid)h.catId=''}); if(sheetPick.cat===cid) sheetPick.cat=(S.cats[0]||{}).id||''; }
+      else if(kind==='ev'){ S.ecats=S.ecats.filter(c=>c.id!==cid); S.events.forEach(e=>{if(e.catId===cid)e.catId=''}); if(sheetPick.ecat===cid) sheetPick.ecat=(S.ecats[0]||{}).id||''; }
+      else { S.mcats=S.mcats.filter(c=>c.id!==cid); S.money.forEach(m=>{if(m.catId===cid)m.catId=''});
+        if(sheetPick.mcat===cid){ const f=S.mcats.find(c=>c.type===moneyType); sheetPick.mcat=f?f.id:''; } }
+      save(); refreshChips(kind); $('#catNew').style.display='none';
+      toast('분류를 지웠어요. 기록은 남아요.');
+    }
+    return;
+  }
+  if(d.newcolor){
+    sheetPick.newColor=d.newcolor;
+    document.querySelectorAll('[data-newcolor]').forEach(x=>x.classList.toggle('on',x.dataset.newcolor===d.newcolor));
+    return;
+  }
+  if(d.addcat){
+    const kind=d.addcat;
+    const nm=$('#f-newcat').value.trim();
+    if(!nm) return;
+    const col=sheetPick.newColor||PALETTE[0];
+    const cid=sheetPick.catEditId;
+    if(cid){
+      const arr=kind==='hab'?S.cats:kind==='ev'?S.ecats:S.mcats;
+      const c=arr.find(x=>x.id===cid);
+      if(c){ c.name=nm; c.color=col; }
+      toast('분류를 고쳤어요');
+    } else {
+      const id=uid();
+      if(kind==='hab'){ S.cats.push({id,name:nm,color:col}); sheetPick.cat=id; }
+      else if(kind==='ev'){ S.ecats.push({id,name:nm,color:col}); sheetPick.ecat=id; }
+      else { S.mcats.push({id,name:nm,color:col,type:moneyType}); sheetPick.mcat=id; }
+      toast('분류를 만들었어요');
+    }
+    sheetPick.catEditId=''; sheetPick.catEdit=false;
+    save(); refreshChips(kind);
+    $('#f-newcat').value=''; $('#catNew').style.display='none';
+    return;
+  }
   if(d.mvhab){
     const [hid,dir]=d.mvhab.split(':');
     const h=S.habits.find(x=>x.id===hid);
@@ -2699,9 +2927,11 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:12,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:15,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
-       lines:S.lines,lineMode:S.lineMode,collapsed:{},homeView:S.homeView,logs:{},seeded:false};
+       lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
+       collapsed:{},homeView:S.homeView,
+       logs:{},seeded:false};
     save();tab='today';view=today();render();toast('처음 상태로 돌렸어요');return;
   }
 });
