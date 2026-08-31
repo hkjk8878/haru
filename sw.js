@@ -1,16 +1,16 @@
 /* 하루 — 서비스워커
    앱 파일을 캐시해 두어 인터넷이 없어도 열리게 합니다.
    index.html을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요. */
-const VERSION = 'haru-v24';
+const VERSION = 'haru-v25';
 const FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
   './keygen.html',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-maskable.png',
-  './apple-touch-icon.png'
+  './icon-192-v24.png',
+  './icon-512-v24.png',
+  './icon-maskable-v24.png',
+  './apple-touch-icon-v24.png'
 ];
 
 self.addEventListener('install', e => {
@@ -66,8 +66,8 @@ self.addEventListener('push', e => {
   const body = d.body || '확인할 것이 있어요';
   e.waitUntil(self.registration.showNotification(title, {
     body,
-    icon: './icon-192.png',
-    badge: './icon-192.png',
+    icon: './icon-192-v24.png',
+    badge: './icon-192-v24.png',
     tag: d.tag || ('haru-' + Date.now()),
     data: { url: './index.html' }
   }));
