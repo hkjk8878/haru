@@ -190,6 +190,37 @@ export default {
       return json({ ok: true, 지금: t.hm, 보낸알림: r.sent, 등록기기: r.checked });
     }
 
+    /* ── 기기 사이 기록 동기화 ── */
+    if (url.pathname === '/sync' && req.method === 'POST') {
+      let b;
+      try { b = await req.json(); } catch (e) { return json({ error: '잘못된 요청' }, 400); }
+      const room = String((b && b.room) || '').trim();
+      if (!/^[A-Za-z0-9._-]{4,40}$/.test(room)) return json({ error: '동기화 코드 형식이 맞지 않아요' }, 400);
+      const key = 'data:' + room;
+
+      // 서버에 있는 것 읽기
+      const raw = await env.HARU.get(key);
+      let server = null;
+      if (raw) { try { server = JSON.parse(raw); } catch (e) { server = null; } }
+
+      // 올려보낸 것이 없으면 서버 것만 돌려줌 (내려받기)
+      if (!b.data) {
+        return json({ ok: true, data: server ? server.data : null, rev: server ? server.rev : 0 });
+      }
+
+      const myRev = typeof b.rev === 'number' ? b.rev : 0;
+      const svRev = server ? server.rev : 0;
+
+      // 서버가 더 최신이면 내 것을 덮지 않고 서버 것을 내려줌
+      if (svRev > myRev) {
+        return json({ ok: true, stale: true, data: server.data, rev: svRev });
+      }
+
+      const rev = svRev + 1;
+      await env.HARU.put(key, JSON.stringify({ rev, data: b.data, at: new Date().toISOString() }));
+      return json({ ok: true, saved: true, rev });
+    }
+
     if (url.pathname === '/key') {
       if (!env.VAPID_PUBLIC) return json({ error: 'VAPID_PUBLIC 환경 변수가 없어요' }, 500);
       return json({ key: env.VAPID_PUBLIC });
