@@ -150,7 +150,7 @@ input,select,textarea{font:inherit;color:inherit}
 .hb .at{font-size:11.5px !important;padding:5px 8px !important}
 .hb .st{font-size:11.5px !important}
 .hb .cnt{flex:none;font-size:11.5px;font-weight:750;color:var(--habit);background:var(--habit-soft);
-  padding:5px 9px;border-radius:999px}
+  padding:5px 9px;border-radius:999px;display:inline-block}
 .hb .cnt.full{background:var(--habit);color:var(--onAccent)}
 .hb .rest{flex:none;font-size:11px;font-weight:700;color:var(--muted);background:var(--cell2);
   padding:5px 8px;border-radius:999px}
@@ -493,7 +493,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v39';
+const APP_VER='v41';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -503,7 +503,7 @@ const PALETTE=['#B8425F','#D9557A','#C4553C','#E08A3C','#A2660C','#8A7A1E',
 const OFFS=[['','알림 없음'],['0','정시에'],['5','5분 전'],['10','10분 전'],['30','30분 전'],['60','1시간 전'],['1440','하루 전']];
 const offLabel=v=>(OFFS.find(o=>o[0]===String(v))||['',''])[1];
 
-let installEvt=null, homeTab='routine';
+let installEvt=null, homeTab='routine', alarmOpen=false;
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
     statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
     sheetDays=[], sheetPick={}, moneyType='out';
@@ -618,7 +618,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:19,
+    version:20,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type])=>({id,name,color,type})),
@@ -691,6 +691,7 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<20){ (d.habits||[]).forEach(h=>{h.rounds=h.rounds||[]}); d.version=20; }
   if(d.version<19){ (d.habits||[]).forEach(h=>{h.byDay=h.byDay||{}}); d.version=19; }
   if(d.version<18){ (d.habits||[]).forEach(h=>{h.from=h.from||''; h.to=h.to||''}); d.version=18; }
   if(d.version<17){ (d.habits||[]).forEach(h=>{h.times=h.times||1}); d.version=17; }
@@ -874,16 +875,22 @@ const effGroupDow=(h,dw)=>{const b=bd(h,dw);return (b&&typeof b.g==='string')?b.
 const effTimeDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.t)?b.t:(h.time||'')};
 const effMinDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.m)?b.m:(h.min||0)};
 const effMin=(h,d)=>effMinDow(h,dow(d));
+const roundOf=(h,i)=>((h.rounds&&h.rounds[i])||{});
+const rGroupDow=(h,i,dw)=>{const r=roundOf(h,i);return (typeof r.g==='string')?r.g:effGroupDow(h,dw)};
+const rTimeDow=(h,i,dw)=>{const r=roundOf(h,i);return r.t||effTimeDow(h,dw)};
+const rMinDow=(h,i,dw)=>{const r=roundOf(h,i);return r.m||effMinDow(h,dw)};
+const rGroup=(h,i,d)=>rGroupDow(h,i,dow(d));
+const rTime=(h,i,d)=>rTimeDow(h,i,dow(d));
+const rMin=(h,i,d)=>rMinDow(h,i,dow(d));
 const effGroup=(h,d)=>effGroupDow(h,dow(d));
 const effTime=(h,d)=>effTimeDow(h,dow(d));
 const hasByDay=h=>!!(h.byDay&&Object.keys(h.byDay).length);
 const onDay=(h,d)=>habDays(h).includes(dow(d))&&inRange(h,d);
 const habitsOn=d=>S.habits.filter(h=>alive(h)&&onDay(h,d)&&inMode(modeOf(h),d));
-const soloOn=d=>S.habits.filter(h=>alive(h)&&effGroup(h,d)===''&&onDay(h,d)&&inMode(h.mode||'',d))
-  .sort((a,b)=>{
-    const ta=effTime(a,d)||'99:99', tb=effTime(b,d)||'99:99';
-    return (ta<tb?-1:ta>tb?1:0)||byOrd(a,b);
-  });
+const soloOn=d=>{
+  const seen={};
+  return occSolo(d).filter(o=>seen[o.h.id]?false:(seen[o.h.id]=true)).map(o=>o.h);
+};
 const byOrd=(a,b)=>(a.ord||0)-(b.ord||0);
 function activeMode(d){
   const ov=S.modeOverride;
@@ -906,12 +913,32 @@ function inMode(mv,d){
 const modeOf=h=>h.mode||((grpOf(h.groupId)||{}).mode||'');
 const habitsOfGroup=gid=>S.habits.filter(h=>h.groupId===gid).sort(byOrd);
 const inGroupAny=(h,gid)=>h.groupId===gid||
-  (h.byDay&&Object.keys(h.byDay).some(k=>h.byDay[k].g===gid));
+  (h.byDay&&Object.keys(h.byDay).some(k=>h.byDay[k].g===gid))||
+  (h.rounds&&h.rounds.some(r=>r&&r.g===gid));
 const habitsOfGroupAny=gid=>S.habits.filter(h=>inGroupAny(h,gid)).sort(byOrd);
-const noGroupAny=h=>!h.groupId&&!(h.byDay&&Object.keys(h.byDay).some(k=>typeof h.byDay[k].g==='string'&&h.byDay[k].g));
-const habitsOfGroupOn=(gid,d)=>S.habits
-  .filter(h=>alive(h)&&effGroup(h,d)===gid&&onDay(h,d)&&inMode(modeOf(h),d))
-  .sort(byOrd);
+const noGroupAny=h=>!h.groupId
+  &&!(h.byDay&&Object.keys(h.byDay).some(k=>typeof h.byDay[k].g==='string'&&h.byDay[k].g))
+  &&!(h.rounds&&h.rounds.some(r=>r&&r.g));
+function occOn(d){
+  const out=[];
+  S.habits.forEach(h=>{
+    if(!alive(h)||!onDay(h,d)||!inMode(modeOf(h),d)) return;
+    const t=habTimes(h.id);
+    for(let i=0;i<t;i++) out.push({h,i});
+  });
+  return out;
+}
+const occSort=(d)=>(a,b)=>{
+  const ta=rTime(a.h,a.i,d)||'99:99', tb=rTime(b.h,b.i,d)||'99:99';
+  return (ta<tb?-1:ta>tb?1:0)||((a.h.ord||0)-(b.h.ord||0))||(a.i-b.i);
+};
+const occOfGroup=(gid,d)=>occOn(d).filter(o=>rGroup(o.h,o.i,d)===gid).sort(occSort(d));
+const occSolo=d=>occOn(d).filter(o=>rGroup(o.h,o.i,d)==='').sort(occSort(d));
+const occDone=(d,o)=>doneN(d,o.h.id)>o.i;
+const habitsOfGroupOn=(gid,d)=>{
+  const seen={};
+  return occOfGroup(gid,d).filter(o=>seen[o.h.id]?false:(seen[o.h.id]=true)).map(o=>o.h);
+};
 const byGord=(a,b)=>(a.gord||0)-(b.gord||0);
 const groupsOn=d=>S.groups.filter(g=>inMode(g.mode,d)&&habitsOfGroupOn(g.id,d).length)
   .sort((a,b)=>{
@@ -933,10 +960,14 @@ const todosOn=d=>S.todos.filter(t=>t.date===d);
 const moneyOn=d=>S.money.filter(m=>m.date===d);
 const moneyIn=ym=>S.money.filter(m=>monthOf(m.date)===ym);
 const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
-const rate=d=>{
-  const hs=habitsOn(d).filter(h=>!isSkip(d,h.id));
-  return hs.length?hs.filter(h=>isDone(d,h.id)).length/hs.length:null;
-};
+function rateList(d,hs){
+  let tot=0,dn=0;
+  hs.filter(h=>!isSkip(d,h.id)).forEach(h=>{
+    const t=habTimes(h.id); tot+=t; dn+=Math.min(doneN(d,h.id),t);
+  });
+  return tot?dn/tot:null;
+}
+const rate=d=>rateList(d,habitsOn(d));
 function streak(h){
   let n=0,d=today(),days=habDays(h);
   for(let i=0;i<400;i++){
@@ -969,12 +1000,15 @@ function alarmsFor(d){
   });
   S.habits.forEach(h=>{
     if(!h.notify||!alive(h)) return;
-    const ht=effTime(h,d);
-    if(!ht) return;
-    if(!onDay(h,d)) return;
-    if(!inMode(modeOf(h),d)) return;
-    out.push({key:'h'+h.id,at:toMin(ht)-+h.notify,title:h.name+' 시간이에요',
-      body:h.min?h.min+'분 예정':'',label:h.name,kind:'습관'});
+    if(!onDay(h,d)||!inMode(modeOf(h),d)) return;
+    const t=habTimes(h.id);
+    for(let i=0;i<t;i++){
+      const ht=rTime(h,i,d);
+      if(!ht) continue;
+      out.push({key:'h'+h.id+'_'+i,at:toMin(ht)-+h.notify,
+        title:h.name+(t>1?` (${i+1}회차)`:'')+' 시간이에요',
+        body:rMin(h,i,d)?rMin(h,i,d)+'분 예정':'',label:h.name,kind:'습관'});
+    }
   });
   eventsOn(d).forEach(e=>{
     if(!e.notify) return;
@@ -1222,25 +1256,30 @@ function pushSchedule(){
   S.habits.forEach(h=>{
     if(!h.notify||!alive(h)) return;
     const body=h.min?h.min+'분 예정':'';
+    const tms=habTimes(h.id);
     if(h.from||h.to){
       for(let i=0;i<120;i++){
         const d=addDays(t,i);
         if(d>limit) break;
         if(!onDay(h,d)) continue;
-        const ht=effTime(h,d); if(!ht) continue;
-        const at=toMin(ht)-+h.notify; if(at<0) continue;
-        dated.push({k:'h'+h.id,date:d,at:toTime(at),title:h.name+' 시간이에요',body});
+        for(let k=0;k<tms;k++){
+          const ht=rTime(h,k,d); if(!ht) continue;
+          const at=toMin(ht)-+h.notify; if(at<0) continue;
+          dated.push({k:'h'+h.id+'_'+k,date:d,at:toTime(at),
+            title:h.name+(tms>1?` (${k+1}회차)`:'')+' 시간이에요',body});
+        }
       }
     } else {
-      const map={};
-      habDays(h).forEach(dw=>{
-        const ht=effTimeDow(h,dw); if(!ht) return;
-        const at=toMin(ht)-+h.notify; if(at<0) return;
-        const key=toTime(at);
-        (map[key]=map[key]||[]).push(dw);
-      });
-      Object.keys(map).forEach(at=>weekly.push({k:'h'+h.id+at,dow:map[at],at,
-        title:h.name+' 시간이에요',body}));
+      for(let k=0;k<tms;k++){
+        const map={};
+        habDays(h).forEach(dw=>{
+          const ht=rTimeDow(h,k,dw); if(!ht) return;
+          const at=toMin(ht)-+h.notify; if(at<0) return;
+          (map[at]=map[at]||[]).push(dw);
+        });
+        Object.keys(map).forEach(at=>weekly.push({k:'h'+h.id+'_'+k+at,dow:map[at],at:toTime(+at),
+          title:h.name+(tms>1?` (${k+1}회차)`:'')+' 시간이에요',body}));
+      }
     }
   });
   S.events.forEach(e=>{
@@ -1359,29 +1398,35 @@ function levelsOf(h){
   const L=h.lv||{};
   return [['mini','Mini',L.mini],['plus','Plus',L.plus],['max','Max',L.max]].filter(x=>x[2]&&x[2].trim());
 }
-function habitRow(h){
-  const dn=isDone(view,h.id), at=doneAt(view,h.id), v=doneVal(view,h.id);
+function habitRow(o){
+  const h=o.h!==undefined?o.h:o, ri=o.i!==undefined?o.i:0;
+  const tms=habTimes(h.id);
+  const dn=tms>1?doneN(view,h.id)>ri:isDone(view,h.id);
+  const at=doneAt(view,h.id), v=doneVal(view,h.id);
   const c=catOf(h.catId), st=streak(h);
   const lvs=levelsOf(h);
   const cur=(rec(view,h.id)||{}).lv||'';
   const curLv=lvs.find(x=>x[0]===cur);
   const sk=isSkip(view,h.id);
-  const tms=h.times>1?h.times:1, cnt=doneN(view,h.id);
+  const cnt=doneN(view,h.id);
   let right='';
   if(sk) right=`<button class="rest on" data-skip="${h.id}">쉼</button>`;
   else {
-    if(tms>1) right+=`<button class="cnt ${dn?'full':''}" data-hab="${h.id}">${cnt}/${tms}</button>`;
+    if(tms>1) right+=`<span class="cnt ${cnt>=tms?'full':''}">${Math.min(cnt,tms)}/${tms}</span>`;
     if(h.track) right+=`<button class="vv" data-time="${h.id}">${v?esc(v)+(h.unit?esc(h.unit):''):'＋'}</button>`;
     if(h.streakOn!==false&&st>0) right+=`<span class="st">🔥${st}</span>`;
     if(dn) right+=`<button class="at" data-time="${h.id}">${at||'시간'}</button>`;
     else right+=`<button class="rest" data-skip="${h.id}">쉼</button>`;
   }
   const label=curLv?curLv[2]:h.name;
-  const et=effTime(h,view);
+  const et=rTime(h,ri,view);
   const tm=et?`<em class="tm2">${et}</em>`:'';
+  const mnv=rMin(h,ri,view);
+  const tag=lvs.length&&!dn?'lvpick':'hab';
+  const arg=tag==='hab'?`${h.id}:${ri}`:h.id;
   return `<div class="hb ${dn?'done':''} ${sk?'skip':''}" style="border-left-color:${c.color}">
-    <button class="main" data-${lvs.length&&!dn?'lvpick':'hab'}="${h.id}"><span class="tick">✓</span>
-      <span class="nm">${tm}<span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(label)}</span>${effMin(h,view)?`<em class="mn">${effMin(h,view)}분</em>`:''}</span></button>
+    <button class="main" data-${tag}="${arg}"><span class="tick">✓</span>
+      <span class="nm">${tm}<span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(label)}</span>${tms>1?`<em class="mn">${ri+1}회차</em>`:''}${mnv?`<em class="mn">${mnv}분</em>`:''}</span></button>
     ${right}</div>`;
 }
 function evRow(e,d){
@@ -1406,7 +1451,9 @@ function header(){
   const dstr=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일`;
   const greet=lineFor(view);
   const hs=habitsOn(view).filter(h=>!isSkip(view,h.id)),td=todosOn(view);
-  const hd=hs.filter(h=>isDone(view,h.id)).length, tdd=td.filter(x=>x.done).length;
+  const hTot=hs.reduce((a,h)=>a+habTimes(h.id),0);
+  const hd=hs.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
+  const tdd=td.filter(x=>x.done).length;
   const spent=sum(moneyOn(view).filter(m=>m.type==='out'),m=>m.amount);
   const daily=S.budget?Math.round(S.budget/daysIn(monthOf(view))):0;
   return `<div class="top"><div class="datenav">
@@ -1422,8 +1469,8 @@ function header(){
         <span class="bar"><i style="width:${Math.min(100,y.pct*100)}%"></i></span>
         <span class="ys">${Math.round(y.pct*100)}% 지남</span></button>`;})()}
     <div class="gauges">
-      <div class="gauge g-habit"><div class="lab">습관 <b>${hd}<s>/${hs.length}</s></b></div>
-        <div class="bar"><i style="width:${hs.length?hd/hs.length*100:0}%"></i></div></div>
+      <div class="gauge g-habit"><div class="lab">습관 <b>${hd}<s>/${hTot}</s></b></div>
+        <div class="bar"><i style="width:${hTot?hd/hTot*100:0}%"></i></div></div>
       <div class="gauge g-task"><div class="lab">할 일 <b>${tdd}<s>/${td.length}</s></b></div>
         <div class="bar"><i style="width:${td.length?tdd/td.length*100:0}%"></i></div></div>
       <button class="gauge g-money" data-tab="money"><div class="lab">지출 <b>${shortWon(spent)}<s>원</s></b></div>
@@ -1445,11 +1492,12 @@ function vToday(){
   const nm=nowMin();
   const nextA=view===today()?alarmsFor(view).find(x=>x.at>=nm):null;
   const hsAll=habitsOn(view).filter(h=>!isSkip(view,h.id));
-  const hd=hsAll.filter(h=>isDone(view,h.id)).length;
+  const hTot=hsAll.reduce((a,h)=>a+habTimes(h.id),0);
+  const hd=hsAll.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
   const td=todosOn(view), tdd=td.filter(x=>x.done).length;
   const evs=eventsOn(view);
   const out=sum(moneyOn(view).filter(m=>m.type==='out'),m=>m.amount);
-  const tabs=[['routine','루틴',hsAll.length?`${hd}/${hsAll.length}`:''],
+  const tabs=[['routine','루틴',hTot?`${hd}/${hTot}`:''],
               ['todo','할 일',td.length?`${tdd}/${td.length}`:''],
               ['event','일정',evs.length?String(evs.length):''],
               ['money','지출',out?shortWon(out):''],
@@ -1488,34 +1536,37 @@ function tabRoutine(){
     const byT=(a,b)=>(a.time?toMin(a.time):99999)-(b.time?toMin(b.time):99999);
     const buckets=[];
     gs.forEach(g=>{
-      const rs=habitsOfGroupOn(g.id,view).map(h=>({h,time:effTime(h,view)||g.time||''}));
+      const rs=occOfGroup(g.id,view).map(o=>({h:o.h,i:o.i,time:rTime(o.h,o.i,view)||g.time||''}));
       rs.sort(byT);
       buckets.push({name:g.name,time:g.time||(rs[0]?rs[0].time:''),rows:rs});
     });
     if(so.length){
-      const rs=so.map(h=>({h,time:effTime(h,view)||''}));
+      const rs=occSolo(view).map(o=>({h:o.h,i:o.i,time:rTime(o.h,o.i,view)||''}));
       rs.sort(byT);
       buckets.push({name:'따로 하는 습관',time:rs[0]?rs[0].time:'',rows:rs});
     }
     buckets.sort(byT);
     return head+`<div class="card"><div class="lst">${buckets.map(bk=>
       `<div class="lband">${esc(bk.name)}${bk.time?`<u>${bk.time}</u>`:''}</div>`+
-      bk.rows.map(({h,time})=>{
-        const c=catOf(h.catId), dn=isDone(view,h.id), v=doneVal(view,h.id);
+      bk.rows.map(({h,i:ri,time})=>{
+        const tms=habTimes(h.id);
+        const c=catOf(h.catId), dn=tms>1?doneN(view,h.id)>(ri||0):isDone(view,h.id), v=doneVal(view,h.id);
         const st=streak(h), sk=isSkip(view,h.id);
         const lvs=levelsOf(h), cur=(rec(view,h.id)||{}).lv||'';
         const curLv=lvs.find(x=>x[0]===cur);
         const tag=lvs.length&&!dn?'lvpick':'hab';
+        const arg=tag==='hab'?`${h.id}:${ri||0}`:h.id;
         return `<div class="lrow ${dn?'done':''} ${sk?'skip':''}">
           <span class="lw">${time?`<b>${time}</b>`:''}</span>
-          <button class="ln" data-${tag}="${h.id}" style="border-left-color:${c.color}">
+          <button class="ln" data-${tag}="${arg}" style="border-left-color:${c.color}">
             <span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(curLv?curLv[2]:h.name)}</span>
             ${h.track&&v?`<em class="mn">${esc(v)}${esc(h.unit||'')}</em>`:''}
-            ${effMin(h,view)?`<em class="mn">${effMin(h,view)}분</em>`:''}
+            ${tms>1?`<em class="mn">${(ri||0)+1}회차</em>`:''}
+            ${rMin(h,ri||0,view)?`<em class="mn">${rMin(h,ri||0,view)}분</em>`:''}
             ${h.streakOn!==false&&st>0?`<em class="mn">🔥${st}</em>`:''}
             ${sk?'<em class="lrest">쉼</em>':''}
-            ${(h.times>1&&!sk)?`<em class="mn">${doneN(view,h.id)}/${h.times}</em>`:''}</button>
-          <button class="lc" data-${sk?'skip':tag}="${h.id}"
+            ${(tms>1&&!sk)?`<em class="mn">${Math.min(doneN(view,h.id),tms)}/${tms}</em>`:''}</button>
+          <button class="lc" data-${sk?'skip':tag}="${sk?h.id:arg}"
             style="${dn?`background:${c.color};border-color:${c.color}`:(sk?'opacity:.35':'')}">${dn?'✓':(sk?'–':'')}</button>
         </div>`;
       }).join('')
@@ -1523,29 +1574,31 @@ function tabRoutine(){
   }
 
   return head+gs.map(g=>{
-    const hs=habitsOfGroupOn(g.id,view);
-    const act=hs.filter(h=>!isSkip(view,h.id));
-    const done=act.filter(h=>isDone(view,h.id)).length, full=act.length>0&&done===act.length;
+    const occ=occOfGroup(g.id,view);
+    const act=occ.filter(o=>!isSkip(view,o.h.id));
+    const done=act.filter(o=>occDone(view,o)).length, full=act.length>0&&done===act.length;
+    const hs=occ;
     const col=!!(S.collapsed||{})[g.id];
     return `<div class="grp ${full?'full':''}">
       <div class="gh">${ring(act.length?done/act.length:0)}
         <button class="t" data-fold="${g.id}"><b>${esc(g.name)} <i class="fx">${col?'▾':'▴'}</i></b>
-          <small>${g.time?g.time+' · ':''}${g.min?g.min+'분 · ':''}${done}/${act.length} 완료${hs.length>act.length?` · 쉼 ${hs.length-act.length}`:''}${g.notify?' · 🔔':''}${full?' · 오늘 끝!':''}</small></button>
+          <small>${g.time?g.time+' · ':''}${g.min?g.min+'분 · ':''}${done}/${act.length} 완료${occ.length>act.length?` · 쉼 ${occ.length-act.length}`:''}${g.notify?' · 🔔':''}${full?' · 오늘 끝!':''}</small></button>
         <button class="allbtn" data-allgrp="${g.id}">${full?'되돌리기':'모두 체크'}</button></div>
-      ${col?'':hs.map(habitRow).join('')+
+      ${col?'':occ.map(habitRow).join('')+
         `<button class="addbtn" style="color:var(--habit)" data-addgrp="${g.id}">＋ 이 루틴에 습관 넣기</button>`}</div>`;
   }).join('')+
   (so.length?(()=>{
-    const act=so.filter(h=>!isSkip(view,h.id));
-    const dn=act.filter(h=>isDone(view,h.id)).length;
+    const occ=occSolo(view);
+    const act=occ.filter(o=>!isSkip(view,o.h.id));
+    const dn=act.filter(o=>occDone(view,o)).length;
     const full=act.length>0&&dn===act.length;
     const col=!!(S.collapsed||{}).__solo;
     return `<div class="grp ${full?'full':''}">
       <div class="gh">${ring(act.length?dn/act.length:0)}
         <button class="t" data-fold="__solo"><b>습관 <i class="fx">${col?'▾':'▴'}</i></b>
-          <small>${dn}/${act.length} 완료${so.length>act.length?` · 쉼 ${so.length-act.length}`:''}${full?' · 오늘 끝!':''}</small></button>
+          <small>${dn}/${act.length} 완료${occ.length>act.length?` · 쉼 ${occ.length-act.length}`:''}${full?' · 오늘 끝!':''}</small></button>
         <button class="allbtn" data-allsolo="1">${full?'되돌리기':'모두 체크'}</button></div>
-      ${col?'':so.map(habitRow).join('')+
+      ${col?'':occ.map(habitRow).join('')+
         '<button class="addbtn" style="color:var(--habit)" data-newsolo="1">＋ 습관 하나 더</button>'}</div>`;})():'');
 }
 
@@ -1694,13 +1747,19 @@ function vRoutine(){
     `;
 }
 function byDaySummary(h){
-  const out=[];
+  const sig={};
   for(let i=0;i<7;i++){
     const b=bd(h,i); if(!b) continue;
-    const g=(typeof b.g==='string')?(b.g?(grpOf(b.g)||{}).name||'?':'따로'):null;
-    out.push(DAYS[i]+(g?' '+g:'')+(b.t?' '+b.t:''));
+    const k=(typeof b.g==='string'?b.g:'-')+'|'+(b.t||'');
+    (sig[k]=sig[k]||[]).push(i);
   }
-  return out.length?out.join(' / '):'요일별 다름';
+  const keys=Object.keys(sig);
+  if(!keys.length) return '';
+  if(keys.length===1){
+    const t=keys[0].split('|')[1];
+    return sig[keys[0]].map(i=>DAYS[i]).join('')+(t?' '+t:'');
+  }
+  return `요일별 ${keys.length}가지`;
 }
 function mgmtRow(h,i,arr){
   const c=catOf(h.catId), st=streak(h), g=grpOf(h.groupId);
@@ -1713,7 +1772,7 @@ function mgmtRow(h,i,arr){
   return `<div class="mrow" style="border-left-color:${c.color}">
     <button class="minfo" data-edithab="${h.id}">
       <span class="info"><b>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</b>
-        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${hasByDay(h)?' · '+byDaySummary(h):''}${st>1?` · 🔥${st}`:''}</small></span>
+        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${h.times>1?` · 하루 ${h.times}회`:''}${hasByDay(h)?' · '+byDaySummary(h):''}${st>1?` · 🔥${st}`:''}</small></span>
       <span class="week">${grid}</span></button>
     ${many?`<span class="mvs">
       <button data-mvhab="${h.id}:-1" ${i===0?'disabled':''} aria-label="위로">▲</button>
@@ -1975,9 +2034,12 @@ function notifyCard(){
         이 알림은 <b>이 화면이 열려 있는 동안만</b> 울려요. 화면을 닫아도 울리게 하려면 달력 탭에서 폰 캘린더로 내보내세요.
         ${st==='unsupported'?' 지금 환경에서는 시스템 알림이 막혀 있어 앱 안 배너로만 뜹니다.':''}
       </div>
-      ${S.notify.on?(al.length?al.map(a=>`<div class="alarmrow ${a.at<nm?'past':''}">
-        <span class="t">${toTime(a.at)}</span><span class="n">${esc(a.label)}</span>
-        <span class="s">${a.kind}</span></div>`).join('')
+      ${S.notify.on?(al.length?
+        `<button class="addbtn" data-alarmlist="1" style="color:var(--muted)">
+          오늘 예정된 알림 ${al.length}개 ${alarmOpen?'접기 ▴':'펼치기 ▾'}</button>
+         ${alarmOpen?al.map(a=>`<div class="alarmrow ${a.at<nm?'past':''}">
+          <span class="t">${toTime(a.at)}</span><span class="n">${esc(a.label)}</span>
+          <span class="s">${a.kind}</span></div>`).join(''):''}`
         :'<div class="empty">오늘 예정된 알림이 없어요.</div>')
         :`<button class="addbtn" style="color:var(--habit)" data-togglenotify="1">알림 켜기</button>`}
     </div>
@@ -2036,8 +2098,7 @@ function statHabits(){
   });
 }
 function rateOf(d,hs){
-  const a=hs.filter(h=>onDay(h,d)&&!isSkip(d,h.id));
-  return a.length?a.filter(h=>isDone(d,h.id)).length/a.length:null;
+  return rateList(d,hs.filter(h=>onDay(h,d)));
 }
 function avgOf(days,hs){
   const v=days.map(d=>rateOf(d,hs)).filter(x=>x!==null);
@@ -2519,9 +2580,28 @@ function habSheet(gid,id){
       <p style="margin:7px 0 0;font-size:12px;color:var(--muted)">시험 준비처럼 정해진 기간에만 할 습관이면 날짜를 넣어 주세요.
         기간이 지나면 목록에서 저절로 사라집니다.</p></div>
     <div class="field"><label for="f-times">하루 반복 횟수</label>
-      <input id="f-times" type="number" min="1" max="20" value="${h&&h.times>1?h.times:1}">
-      <p style="margin:7px 0 0;font-size:12px;color:var(--muted)">2 이상이면 그만큼 눌러야 완료돼요.
-        예: 물 마시기 3번, 영양제 2번</p></div>
+      <input id="f-times" type="number" min="1" max="6" value="${h&&h.times>1?h.times:1}">
+      <p style="margin:7px 0 0;font-size:12px;color:var(--muted)">2 이상이면 회차마다 한 줄씩 생겨요.
+        아래에서 회차별 시각·루틴을 따로 정할 수 있어요. (예: 아침 씻기 / 저녁 씻기)</p></div>
+    <div id="roundBox" style="display:${(h&&h.times>1)?'block':'none'};margin-bottom:13px">
+      ${[0,1,2,3,4,5].map(i=>{
+        const r=(h&&h.rounds&&h.rounds[i])||{};
+        return `<div class="vrow rrow" data-ri="${i}" style="display:${(h&&h.times>i+1)||i<1?'grid':'none'}">
+          <span class="vd">${i+1}</span>
+          <span class="vb">
+            <label><u>어디에</u>
+              <select id="rg${i}">
+                <option value="-" ${typeof r.g!=='string'?'selected':''}>기본값 그대로</option>
+                <option value="" ${r.g===''?'selected':''}>따로 하기</option>
+                ${S.groups.map(x=>`<option value="${x.id}" ${r.g===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}
+              </select></label>
+            <label><u>시각</u><input id="rt${i}" type="time" value="${r.t||''}"></label>
+            <label><u>소요</u><input id="rm${i}" type="number" min="0" step="5" placeholder="분" value="${r.m||''}"></label>
+          </span>
+        </div>`;
+      }).join('')}
+      <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">비워 둔 회차는 기본 묶음·시각을 씁니다.</p>
+    </div>
     <div class="row2">
       <div class="field"><label for="f-track">트래킹</label>
         <select id="f-track">
@@ -2716,7 +2796,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -2730,6 +2810,7 @@ document.addEventListener('click',ev=>{
   if(d.cfilter){catFilter=d.cfilter;render();return}
   if(d.selday){view=d.selday;render();return}
   if(d.goday){view=d.goday;tab='today';render();window.scrollTo(0,0);return}
+  if(d.alarmlist){alarmOpen=!alarmOpen;render();return}
   if(d.statcat){statCat=d.statcat;render();return}
   if(d.gonote){view=d.gonote;tab='today';homeTab='note';render();window.scrollTo(0,0);return}
   if(d.gotocal){view=d.gotocal;calMonth=monthOf(view);tab='cal';render();window.scrollTo(0,0);return}
@@ -2739,12 +2820,15 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.hab){
-    const l=log(view), t=habTimes(d.hab), r=l.habits[d.hab];
-    if(!r) l.habits[d.hab]={at:view===today()?nowHM():'',lv:'',n:1};
+    const [hid,ris]=d.hab.split(':');
+    const ri=+(ris||0);
+    const l=log(view), t=habTimes(hid), cur=doneN(view,hid);
+    const want=(cur>ri)?ri:ri+1;
+    if(want<=0) delete l.habits[hid];
     else {
-      const n=(r.n||1)+1;
-      if(n>t) delete l.habits[d.hab];
-      else { r.n=n; if(view===today()) r.at=nowHM(); }
+      const r=l.habits[hid];
+      if(!r) l.habits[hid]={at:view===today()?nowHM():'',lv:'',n:Math.min(want,t)};
+      else { r.n=Math.min(want,t); if(view===today()) r.at=nowHM(); }
     }
     save();render();return;
   }
@@ -2891,7 +2975,21 @@ document.addEventListener('click',ev=>{
       min:Math.max(0,+$('#f-min').value||0),
       notify:$('#f-notify').value,
       mode:$('#f-mode').value,
-      times:Math.max(1,Math.min(20,+$('#f-times').value||1)),
+      times:Math.max(1,Math.min(6,+$('#f-times').value||1)),
+      rounds:(()=>{
+        const n=Math.max(1,Math.min(6,+$('#f-times').value||1));
+        if(n<2) return [];
+        const out=[];
+        for(let i=0;i<n;i++){
+          const gv=$('#rg'+i).value, tv=$('#rt'+i).value, mv=+$('#rm'+i).value||0;
+          const e={};
+          if(gv!=='-') e.g=gv;
+          if(tv) e.t=tv;
+          if(mv) e.m=mv;
+          out.push(e);
+        }
+        return out;
+      })(),
       from:$('#f-hfrom').value||'', to:$('#f-hto').value||'',
       byDay:(()=>{
         if($('#f-vary').value!=='1') return {};
@@ -3218,7 +3316,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:19,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:20,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
@@ -3237,6 +3335,13 @@ document.addEventListener('change',e=>{
   }
   if(e.target.id==='f-kind'){$('#timeRow').style.display=e.target.value==='all'?'none':'flex'}
   if(e.target.id==='f-vary'){const b=$('#varyBox');if(b)b.style.display=e.target.value==='1'?'block':'none'}
+  if(e.target.id==='f-times'){
+    const n=Math.max(1,Math.min(6,+e.target.value||1));
+    const box=$('#roundBox'); if(box) box.style.display=n>1?'block':'none';
+    document.querySelectorAll('.rrow').forEach(r=>{
+      r.style.display=(+r.dataset.ri<n)?'grid':'none';
+    });
+  }
   if(e.target.id==='f-date'){
     const ed=$('#f-enddate');
     if(ed&&(!ed.value||ed.value<e.target.value)) ed.value=e.target.value;
