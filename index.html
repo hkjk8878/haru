@@ -431,6 +431,9 @@ nav button.on{color:var(--ink)}
 .field input.amt{font-size:24px;font-weight:750;letter-spacing:-.02em;padding:12px}
 .row2{display:flex;gap:10px}
 .row2 .field{flex:1}
+.vrow{display:grid;grid-template-columns:26px 1fr 96px;gap:7px;align-items:center;margin-bottom:6px}
+.vrow span{font-size:12.5px;font-weight:650;color:var(--muted);text-align:center}
+.vrow select,.vrow input{padding:8px 9px !important;font-size:13px !important;margin:0}
 .dayspick{display:flex;gap:5px}
 .dayspick button{flex:1;height:38px;border-radius:11px;background:var(--card2);text-align:center;
   font-size:13px;font-weight:650;color:var(--muted)}
@@ -481,7 +484,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v33';
+const APP_VER='v34';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -606,7 +609,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:18,
+    version:19,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type])=>({id,name,color,type})),
@@ -679,6 +682,7 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<19){ (d.habits||[]).forEach(h=>{h.byDay=h.byDay||{}}); d.version=19; }
   if(d.version<18){ (d.habits||[]).forEach(h=>{h.from=h.from||''; h.to=h.to||''}); d.version=18; }
   if(d.version<17){ (d.habits||[]).forEach(h=>{h.times=h.times||1}); d.version=17; }
   if(d.version<16){ (d.groups||[]).forEach((g,i)=>{g.gord=i}); d.version=16; }
@@ -856,12 +860,18 @@ const grpOf=id=>S.groups.find(g=>g.id===id);
 const habDays=h=>h.days||((grpOf(h.groupId)||{days:[0,1,2,3,4,5,6]}).days);
 const alive=h=>!h.groupId||!!grpOf(h.groupId);
 const inRange=(h,d)=>(!h.from||d>=h.from)&&(!h.to||d<=h.to);
+const bd=(h,dw)=>(h.byDay&&h.byDay[dw])||null;
+const effGroupDow=(h,dw)=>{const b=bd(h,dw);return (b&&typeof b.g==='string')?b.g:(h.groupId||'')};
+const effTimeDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.t)?b.t:(h.time||'')};
+const effGroup=(h,d)=>effGroupDow(h,dow(d));
+const effTime=(h,d)=>effTimeDow(h,dow(d));
+const hasByDay=h=>!!(h.byDay&&Object.keys(h.byDay).length);
 const onDay=(h,d)=>habDays(h).includes(dow(d))&&inRange(h,d);
 const habitsOn=d=>S.habits.filter(h=>alive(h)&&onDay(h,d)&&inMode(modeOf(h),d));
-const soloOn=d=>S.habits.filter(h=>!h.groupId&&onDay(h,d)&&inMode(h.mode||'',d))
+const soloOn=d=>S.habits.filter(h=>alive(h)&&effGroup(h,d)===''&&onDay(h,d)&&inMode(h.mode||'',d))
   .sort((a,b)=>{
-    const t=((a.time||'99:99')<(b.time||'99:99'))?-1:((a.time||'99:99')>(b.time||'99:99')?1:0);
-    return t||byOrd(a,b);
+    const ta=effTime(a,d)||'99:99', tb=effTime(b,d)||'99:99';
+    return (ta<tb?-1:ta>tb?1:0)||byOrd(a,b);
   });
 const byOrd=(a,b)=>(a.ord||0)-(b.ord||0);
 function activeMode(d){
@@ -884,8 +894,9 @@ function inMode(mv,d){
 }
 const modeOf=h=>h.mode||((grpOf(h.groupId)||{}).mode||'');
 const habitsOfGroup=gid=>S.habits.filter(h=>h.groupId===gid).sort(byOrd);
-const habitsOfGroupOn=(gid,d)=>habitsOfGroup(gid)
-  .filter(h=>onDay(h,d)&&inMode(modeOf(h),d));
+const habitsOfGroupOn=(gid,d)=>S.habits
+  .filter(h=>alive(h)&&effGroup(h,d)===gid&&onDay(h,d)&&inMode(modeOf(h),d))
+  .sort(byOrd);
 const byGord=(a,b)=>(a.gord||0)-(b.gord||0);
 const groupsOn=d=>S.groups.filter(g=>inMode(g.mode,d)&&habitsOfGroupOn(g.id,d).length)
   .sort((a,b)=>{
@@ -942,10 +953,12 @@ function alarmsFor(d){
       body:hs.map(h=>h.name).join(', '),label:g.name,kind:'루틴'});
   });
   S.habits.forEach(h=>{
-    if(!h.time||!h.notify||!alive(h)) return;
+    if(!h.notify||!alive(h)) return;
+    const ht=effTime(h,d);
+    if(!ht) return;
     if(!onDay(h,d)) return;
     if(!inMode(modeOf(h),d)) return;
-    out.push({key:'h'+h.id,at:toMin(h.time)-+h.notify,title:h.name+' 시간이에요',
+    out.push({key:'h'+h.id,at:toMin(ht)-+h.notify,title:h.name+' 시간이에요',
       body:h.min?h.min+'분 예정':'',label:h.name,kind:'습관'});
   });
   eventsOn(d).forEach(e=>{
@@ -1192,20 +1205,27 @@ function pushSchedule(){
       title:g.name+' 시간이에요',body:hs.map(h=>h.name).join(', ').slice(0,90)});
   });
   S.habits.forEach(h=>{
-    if(!h.time||!h.notify||!alive(h)) return;
-    const at=toMin(h.time)-+h.notify;
-    if(at<0) return;
+    if(!h.notify||!alive(h)) return;
     const body=h.min?h.min+'분 예정':'';
     if(h.from||h.to){
       for(let i=0;i<120;i++){
         const d=addDays(t,i);
         if(d>limit) break;
         if(!onDay(h,d)) continue;
+        const ht=effTime(h,d); if(!ht) continue;
+        const at=toMin(ht)-+h.notify; if(at<0) continue;
         dated.push({k:'h'+h.id,date:d,at:toTime(at),title:h.name+' 시간이에요',body});
       }
     } else {
-      weekly.push({k:'h'+h.id,dow:habDays(h).slice(),at:toTime(at),
-        title:h.name+' 시간이에요',body});
+      const map={};
+      habDays(h).forEach(dw=>{
+        const ht=effTimeDow(h,dw); if(!ht) return;
+        const at=toMin(ht)-+h.notify; if(at<0) return;
+        const key=toTime(at);
+        (map[key]=map[key]||[]).push(dw);
+      });
+      Object.keys(map).forEach(at=>weekly.push({k:'h'+h.id+at,dow:map[at],at,
+        title:h.name+' 시간이에요',body}));
     }
   });
   S.events.forEach(e=>{
@@ -1342,7 +1362,8 @@ function habitRow(h){
     else right+=`<button class="rest" data-skip="${h.id}">쉼</button>`;
   }
   const label=curLv?curLv[2]:h.name;
-  const tm=h.time?`<em class="tm2">${h.time}</em>`:'';
+  const et=effTime(h,view);
+  const tm=et?`<em class="tm2">${et}</em>`:'';
   return `<div class="hb ${dn?'done':''} ${sk?'skip':''}" style="border-left-color:${c.color}">
     <button class="main" data-${lvs.length&&!dn?'lvpick':'hab'}="${h.id}"><span class="tick">✓</span>
       <span class="nm">${tm}<span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(label)}</span>${h.min?`<em class="mn">${h.min}분</em>`:''}</span></button>
@@ -1452,12 +1473,12 @@ function tabRoutine(){
     const byT=(a,b)=>(a.time?toMin(a.time):99999)-(b.time?toMin(b.time):99999);
     const buckets=[];
     gs.forEach(g=>{
-      const rs=habitsOfGroupOn(g.id,view).map(h=>({h,time:h.time||g.time||''}));
+      const rs=habitsOfGroupOn(g.id,view).map(h=>({h,time:effTime(h,view)||g.time||''}));
       rs.sort(byT);
       buckets.push({name:g.name,time:g.time||(rs[0]?rs[0].time:''),rows:rs});
     });
     if(so.length){
-      const rs=so.map(h=>({h,time:h.time||''}));
+      const rs=so.map(h=>({h,time:effTime(h,view)||''}));
       rs.sort(byT);
       buckets.push({name:'따로 하는 습관',time:rs[0]?rs[0].time:'',rows:rs});
     }
@@ -1668,7 +1689,7 @@ function mgmtRow(h,i,arr){
   return `<div class="mrow" style="border-left-color:${c.color}">
     <button class="minfo" data-edithab="${h.id}">
       <span class="info"><b>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</b>
-        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${st>1?` · 🔥${st}`:''}</small></span>
+        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${hasByDay(h)?' · 요일별 다름':''}${st>1?` · 🔥${st}`:''}</small></span>
       <span class="week">${grid}</span></button>
     ${many?`<span class="mvs">
       <button data-mvhab="${h.id}:-1" ${i===0?'disabled':''} aria-label="위로">▲</button>
@@ -2431,6 +2452,27 @@ function habSheet(gid,id){
         <option value="1" ${(h&&h.days)||solo?'selected':''}>이 습관만 직접 지정</option></select></div>
     <div class="field" id="ownDays" style="display:${(h&&h.days)||solo?'block':'none'}">
       <label>실천 요일</label>${daysPicker()}</div>
+    <div class="field"><label for="f-vary">요일별로 다르게</label>
+      <select id="f-vary">
+        <option value="0" ${h&&hasByDay(h)?'':'selected'}>모든 요일 같게</option>
+        <option value="1" ${h&&hasByDay(h)?'selected':''}>요일마다 시각·루틴 다르게</option>
+      </select></div>
+    <div id="varyBox" style="display:${h&&hasByDay(h)?'block':'none'};margin-bottom:13px">
+      ${DAYS.map((dn,i)=>{
+        const b=h&&h.byDay?h.byDay[i]:null;
+        return `<div class="vrow" data-vd="${i}">
+          <span>${dn}</span>
+          <select id="vg${i}">
+            <option value="" ${(b&&b.g==='')?'selected':''}>따로</option>
+            ${S.groups.map(x=>`<option value="${x.id}" ${(b&&b.g===x.id)?'selected':''}>${esc(x.name)}</option>`).join('')}
+            <option value="-" ${(!b||typeof b.g!=='string')?'selected':''}>기본값</option>
+          </select>
+          <input id="vt${i}" type="time" value="${b&&b.t?b.t:''}">
+        </div>`;
+      }).join('')}
+      <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">비워 둔 요일은 위에서 정한 기본 묶음·시각을 씁니다.
+        복사해서 여러 개 만들 필요 없어요.</p>
+    </div>
     <div id="soloBox">
       <div class="row2"><div class="field"><label for="f-time2">이 습관 시각</label>
           <input id="f-time2" type="time" value="${h?h.time||'':''}"></div>
@@ -2815,6 +2857,19 @@ document.addEventListener('click',ev=>{
       mode:$('#f-mode').value,
       times:Math.max(1,Math.min(20,+$('#f-times').value||1)),
       from:$('#f-hfrom').value||'', to:$('#f-hto').value||'',
+      byDay:(()=>{
+        if($('#f-vary').value!=='1') return {};
+        const o={};
+        for(let i=0;i<7;i++){
+          const gv=$('#vg'+i).value, tv=$('#vt'+i).value;
+          if(gv==='-'&&!tv) continue;
+          const e={};
+          if(gv!=='-') e.g=gv;
+          if(tv) e.t=tv;
+          if(Object.keys(e).length) o[i]=e;
+        }
+        return o;
+      })(),
       track:$('#f-track').value,unit:$('#f-unit').value.trim(),streakOn:$('#f-streak').value==='1',
       lv:{mini:$('#f-mini').value.trim(),plus:$('#f-plus').value.trim(),max:$('#f-max').value.trim()}};
     if(d.savehab) Object.assign(S.habits.find(x=>x.id===d.savehab),o);
@@ -3126,7 +3181,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:18,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:19,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
@@ -3144,6 +3199,7 @@ document.addEventListener('change',e=>{
     if(od) od.style.display=solo?'block':($('#f-own').value==='1'?'block':'none');
   }
   if(e.target.id==='f-kind'){$('#timeRow').style.display=e.target.value==='all'?'none':'flex'}
+  if(e.target.id==='f-vary'){const b=$('#varyBox');if(b)b.style.display=e.target.value==='1'?'block':'none'}
   if(e.target.id==='f-date'){
     const ed=$('#f-enddate');
     if(ed&&(!ed.value||ed.value<e.target.value)) ed.value=e.target.value;
