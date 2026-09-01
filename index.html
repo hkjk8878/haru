@@ -449,6 +449,15 @@ nav button.on{color:var(--ink)}
 .sec[open]>summary::after{content:'▴'}
 .sec .secin{padding:13px 13px 4px}
 .sec .tip{margin:7px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+.prev{display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.prev:last-child{border-bottom:none}
+.prev em{font-style:normal;flex:none;width:64px;font-size:12px;color:var(--muted)}
+.prev span{flex:1;min-width:0}
+.pastday{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.pastday:last-of-type{border-bottom:none}
+.pd{display:flex;width:100%;gap:8px;align-items:baseline;font-size:12.5px;color:var(--muted);padding:2px}
+.pd b{font-weight:700;color:var(--ink);font-size:13px}
+.pd span{margin-left:auto}
 .xsec{grid-column:2;margin-top:7px}
 .xsec>summary{list-style:none;font-size:11.5px;color:var(--muted);cursor:pointer;padding:4px 0}
 .xsec>summary::-webkit-details-marker{display:none}
@@ -516,7 +525,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v46';
+const APP_VER='v49';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -962,10 +971,8 @@ function occOn(d){
   });
   return out;
 }
-const occSort=(d)=>(a,b)=>{
-  const ta=rTime(a.h,a.i,d)||'99:99', tb=rTime(b.h,b.i,d)||'99:99';
-  return (ta<tb?-1:ta>tb?1:0)||((a.h.ord||0)-(b.h.ord||0))||(a.i-b.i);
-};
+/* 오늘 화면 카드는 루틴 탭에서 정한 순서를 그대로 따른다 (시각으로 다시 정렬하지 않음) */
+const occSort=(d)=>(a,b)=>((a.h.ord||0)-(b.h.ord||0))||(a.i-b.i);
 const occOfGroup=(gid,d)=>occOn(d).filter(o=>rGroup(o.h,o.i,d)===gid).sort(occSort(d));
 const occSolo=d=>occOn(d).filter(o=>rGroup(o.h,o.i,d)==='').sort(occSort(d));
 const occDone=(d,o)=>doneN(d,o.h.id)>o.i;
@@ -976,10 +983,7 @@ const habitsOfGroupOn=(gid,d)=>{
 const byGord=(a,b)=>(a.gord||0)-(b.gord||0);
 const groupsSorted=()=>S.groups.slice().sort(byGord);
 const groupsOn=d=>S.groups.filter(g=>inMode(g.mode,d)&&habitsOfGroupOn(g.id,d).length)
-  .sort((a,b)=>{
-    const t=((a.time||'99:99')<(b.time||'99:99'))?-1:((a.time||'99:99')>(b.time||'99:99')?1:0);
-    return t||byGord(a,b);
-  });
+  .sort(byGord);
 const isRepeat=e=>!!(e.repeatDays&&e.repeatDays.length);
 const evSpan=e=>(!isRepeat(e)&&e.date&&e.endDate)?diffDays(e.date,e.endDate)+1:1;
 function eventsOn(d){
@@ -1448,7 +1452,9 @@ function habitRow(o){
   if(sk) right=`<button class="rest on" data-skip="${h.id}">쉼</button>`;
   else {
     if(tms>1) right+=`<span class="cnt ${cnt>=tms?'full':''}">${Math.min(cnt,tms)}/${tms}</span>`;
-    if(h.track) right+=`<button class="vv" data-time="${h.id}">${v?esc(v)+(h.unit?esc(h.unit):''):'＋'}</button>`;
+    if(h.track) right+=`<button class="vv" data-time="${h.id}">${v
+      ?esc(h.track==='text'?(v.length>9?v.slice(0,9)+'…':v):v+(h.unit||''))
+      :'＋'}</button>`;
     if(h.streakOn!==false&&st>0) right+=`<span class="st">🔥${st}</span>`;
     if(dn) right+=`<button class="at" data-time="${h.id}">${at||'시간'}</button>`;
     else right+=`<button class="rest" data-skip="${h.id}">쉼</button>`;
@@ -1656,7 +1662,26 @@ function tabTodo(){
         <button class="x" data-deltodo="${t.id}" aria-label="삭제">×</button></div>`).join('')}
       ${(!list.length&&!steps.length)?'<div class="empty">오늘 꼭 끝낼 한 가지만 적어 보세요.</div>':''}</div>
       <div class="addtodo"><input id="todoInput" type="text" placeholder="할 일 적기" maxlength="80">
-        <button data-addtodo="1">추가</button></div></div>`;
+        <button data-addtodo="1">추가</button></div></div>
+    ${(()=>{
+      const days=[];
+      for(let i=1;i<=21;i++){ const d=addDays(view,-i); if(todosOn(d).length) days.push(d); }
+      if(!days.length) return '';
+      const left=days.reduce((a,d)=>a+todosOn(d).filter(t=>!t.done).length,0);
+      return `<details class="sec" style="margin-top:14px"><summary>지난 할 일 ${left?`· 안 끝낸 것 ${left}개`:''}</summary>
+        <div class="secin">
+          ${days.map(d=>{
+            const ts=todosOn(d), dn=ts.filter(t=>t.done).length;
+            return `<div class="pastday">
+              <button class="pd" data-goday="${d}"><b>${md(d)} ${DAYS[dow(d)]}</b><span>${dn}/${ts.length} ›</span></button>
+              ${ts.map(t=>`<div class="todo ${t.done?'done':''}" style="padding:7px 2px;border:none">
+                <button class="box" data-todo="${t.id}" aria-label="완료">✓</button>
+                <span data-todo="${t.id}">${esc(t.title)}</span></div>`).join('')}
+            </div>`;
+          }).join('')}
+          <p class="tip">최근 3주치만 보여줍니다. 여기서도 바로 체크할 수 있어요.</p>
+        </div></details>`;
+    })()}`;
 }
 
 /* ── 일정 탭 ── */
@@ -1851,6 +1876,13 @@ function vCal(){
         <span class="bd"><b>${esc(s.title)}</b><small>${esc(g.title)}</small></span></div>`).join('')}
       ${evs.map(e=>evRow(e,view)).join('')}
       ${(!evs.length&&!dueG.length&&!dueS.length)?'<div class="empty">이 날은 비어 있어요.</div>':''}
+      ${todosOn(view).map(t=>`<div class="ev" style="border-left-color:var(--task)">
+        <span class="tm" style="color:var(--task)">할 일</span>
+        <span class="bd"><b style="font-weight:600;${t.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</b></span>
+        <button class="box" data-todo="${t.id}" style="width:21px;height:21px;flex:none;border-radius:7px;
+          border:1.7px solid ${t.done?'var(--task)':'#4E3A44'};background:${t.done?'var(--task)':'transparent'};
+          color:${t.done?'var(--onAccent)':'transparent'};display:grid;place-items:center;font-size:12px">✓</button>
+      </div>`).join('')}
       ${(()=>{const nt=((S.logs[view]||{}).note||'').trim();
         return nt?`<div class="ev" style="border-left-color:var(--muted)">
           <span class="tm" style="color:var(--muted)">한 줄</span>
@@ -2234,6 +2266,12 @@ function habitMonthCard(h,ym){
   } else if(h.track==='time'){
     const at=avgTime(h,days.filter(d=>d<=today()));
     if(at) extra=`<div class="hx">평균 ${at}</div>`;
+  } else if(h.track==='text'){
+    const ds=days.filter(d=>d<=today()&&doneVal(d,h.id)).sort().reverse();
+    if(ds.length){
+      const v=doneVal(ds[0],h.id);
+      extra=`<div class="hx">${esc(v.length>12?v.slice(0,12)+'…':v)}</div>`;
+    }
   }
   const st=h.streakOn!==false?streak(h):0;
   return `<div class="hcard">
@@ -2469,9 +2507,19 @@ function timeSheet(hid){
   const h=S.habits.find(x=>x.id===hid);
   const tr=h.track||'';
   openSheet(`<h2>오늘 기록</h2><p class="hint">${esc(h.name)} · ${md(view)}</p>
-    ${tr?`<div class="field"><label for="f-val">${tr==='time'?'시간 (분·시간 등)':'수치'}${h.unit?' — '+esc(h.unit):''}</label>
+    ${tr?`<div class="field"><label for="f-val">${tr==='time'?'시간·분량':tr==='text'?'메모':'수치'}${h.unit?' — '+esc(h.unit):''}</label>
       <input id="f-val" type="${tr==='num'?'number':'text'}" inputmode="${tr==='num'?'decimal':'text'}"
-        value="${esc(doneVal(view,hid))}" placeholder="${tr==='num'?'62.5':'30분'}"></div>`:''}
+        value="${esc(doneVal(view,hid))}" maxlength="${tr==='text'?60:20}"
+        placeholder="${tr==='num'?'62.5':tr==='text'?'데미안 · 32쪽까지':'30분'}"></div>
+      ${(()=>{
+        const past=[];
+        for(let i=1;i<=60&&past.length<5;i++){
+          const d=addDays(view,-i), v=doneVal(d,hid);
+          if(v) past.push([d,v]);
+        }
+        return past.length?`<div class="field"><label>최근 기록</label>
+          ${past.map(([d,v])=>`<div class="prev"><em>${md(d)}</em><span>${esc(v)}</span></div>`).join('')}</div>`:'';
+      })()}`:''}
     <div class="field"><label for="f-time">몇 시에 했나요</label>
       <input id="f-time" type="time" value="${doneAt(view,hid)||nowHM()}"></div>
     <div class="quick"><button type="button" data-settime="${nowHM()}">지금 (${nowHM()})</button>
@@ -2670,8 +2718,9 @@ function habSheet(gid,id){
           <div class="field"><label for="f-track">트래킹</label>
             <select id="f-track">
               <option value="" ${h&&h.track?'':'selected'}>안 함</option>
-              <option value="num" ${h&&h.track==='num'?'selected':''}>숫자 기록</option>
-              <option value="time" ${h&&h.track==='time'?'selected':''}>시간·분량 기록</option>
+              <option value="num" ${h&&h.track==='num'?'selected':''}>숫자 (62.5)</option>
+              <option value="time" ${h&&h.track==='time'?'selected':''}>시간·분량 (30분)</option>
+              <option value="text" ${h&&h.track==='text'?'selected':''}>메모 (읽은 책 등)</option>
             </select></div>
           <div class="field"><label for="f-unit">단위</label>
             <input id="f-unit" type="text" value="${h?esc(h.unit||''):''}" placeholder="kg, 쪽" maxlength="6"></div>
