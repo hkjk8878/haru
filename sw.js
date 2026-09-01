@@ -1,7 +1,7 @@
 /* 하루 — 서비스워커
    앱 파일을 캐시해 두어 인터넷이 없어도 열리게 합니다.
    index.html을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요. */
-const VERSION = 'haru-v25';
+const VERSION = 'haru-v31';
 const FILES = [
   './',
   './index.html',
@@ -50,11 +50,15 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  /* 자산도 네트워크를 먼저 시도해 새 파일이 바로 반영되게 한다.
+     실패(오프라인)하면 캐시에서 꺼낸다. */
   e.respondWith(
-    caches.match(req).then(hit => hit || fetch(req).then(res => {
-      caches.open(VERSION).then(c => c.put(req, res.clone())).catch(() => {});
-      return res;
-    }))
+    fetch(req)
+      .then(res => {
+        caches.open(VERSION).then(c => c.put(req, res.clone())).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
 
