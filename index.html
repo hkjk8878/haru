@@ -182,14 +182,14 @@ input,select,textarea{font:inherit;color:inherit}
 .wkr i{height:22px;border-radius:6px;background:var(--cell);display:block}
 .wkr i.on{background:var(--habit)}
 .wkr i.miss{background:var(--task-soft);box-shadow:inset 0 0 0 1.5px var(--task)}
-.wkr i.off{background:transparent}
-.wkr i.fu,.wkr i.sch{background:transparent;box-shadow:inset 0 0 0 1.5px var(--habit)}
+.wkr i.off{background:var(--cell);opacity:.55}
+.wkr i.fu,.wkr i.sch{background:var(--cell);box-shadow:inset 0 0 0 1.5px var(--habit)}
 .wkr i.sk{background:var(--goal-soft);box-shadow:inset 0 0 0 1.5px var(--goal)}
 .wkl{display:flex;align-items:center;gap:5px;padding:2px 16px 14px;font-size:11px;color:var(--muted)}
 .wkl i{width:12px;height:12px;border-radius:4px;display:inline-block;background:var(--cell)}
 .wkl i.on{background:var(--habit)}
 .wkl i.miss{background:var(--task-soft);box-shadow:inset 0 0 0 1.5px var(--task)}
-.wkl i.off{background:transparent;box-shadow:inset 0 0 0 1px var(--line);opacity:.5}
+.wkl i.off{background:var(--cell);opacity:.55}
 .wkl i.sk{background:var(--goal-soft);box-shadow:inset 0 0 0 1.5px var(--goal)}
 .gcal{padding:6px 14px 10px}
 .gch{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px}
@@ -318,7 +318,7 @@ input,select,textarea{font:inherit;color:inherit}
 .hcal i{aspect-ratio:1;border-radius:4px;display:grid;place-items:center;font-style:normal;
   font-size:8px;font-weight:600;color:var(--muted);background:var(--cell)}
 .hcal i.e{background:transparent}
-.hcal i.off{background:transparent;color:#39404E}
+.hcal i.off{background:var(--cell);color:#39404E;opacity:.55}
 .hcal i.miss{background:var(--task-soft);color:var(--task)}
 .hcal i.fu{background:var(--cell);color:#4A5160}
 .hcard .hf{display:flex;align-items:baseline;justify-content:space-between;margin-top:9px}
@@ -484,7 +484,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v34';
+const APP_VER='v36';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1644,7 +1644,7 @@ function vRoutine(){
     <div class="seg">
       <button data-rmode="group" class="${routineMode==='group'?'on':''}">묶음별</button>
       <button data-rmode="cat" class="${routineMode==='cat'?'on':''}">분류별</button></div></div>`+body+
-    `${(()=>{const so=S.habits.filter(h=>!h.groupId&&(catFilter==='all'||h.catId===catFilter)).sort(byOrd);
+    `${routineMode==='cat'?'':(()=>{const so=S.habits.filter(h=>!h.groupId&&(catFilter==='all'||h.catId===catFilter)).sort(byOrd);
       return `<div class="card"><header><h2>따로 하는 습관</h2>
         <span class="count">${so.length}개</span>
         <button class="add" style="color:var(--habit)" data-newsolo="1">＋ 추가</button></header>
