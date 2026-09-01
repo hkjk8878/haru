@@ -180,12 +180,14 @@ input,select,textarea{font:inherit;color:inherit}
 .wkr{padding:4px 0}
 .wkr span{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
 .wkr i{height:22px;border-radius:6px;background:var(--cell);display:block}
+.wkr i.on{background:var(--habit)}
 .wkr i.miss{background:var(--task-soft);box-shadow:inset 0 0 0 1.5px var(--task)}
 .wkr i.off{background:transparent}
 .wkr i.fu,.wkr i.sch{background:transparent;box-shadow:inset 0 0 0 1.5px var(--habit)}
 .wkr i.sk{background:var(--goal-soft);box-shadow:inset 0 0 0 1.5px var(--goal)}
 .wkl{display:flex;align-items:center;gap:5px;padding:2px 16px 14px;font-size:11px;color:var(--muted)}
 .wkl i{width:12px;height:12px;border-radius:4px;display:inline-block;background:var(--cell)}
+.wkl i.on{background:var(--habit)}
 .wkl i.miss{background:var(--task-soft);box-shadow:inset 0 0 0 1.5px var(--task)}
 .wkl i.off{background:transparent;box-shadow:inset 0 0 0 1px var(--line);opacity:.5}
 .wkl i.sk{background:var(--goal-soft);box-shadow:inset 0 0 0 1.5px var(--goal)}
@@ -470,7 +472,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v31';
+const APP_VER='v32';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -482,7 +484,7 @@ const offLabel=v=>(OFFS.find(o=>o[0]===String(v))||['',''])[1];
 
 let installEvt=null, homeTab='routine';
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
-    statMode='week', statYM=null, weekStart=null, routineMode='group', catFilter='all', focusTodo=false,
+    statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
     sheetDays=[], sheetPick={}, moneyType='out';
 
 const $=s=>document.querySelector(s);
@@ -1943,6 +1945,33 @@ function vSet(){
       <button class="addbtn" style="color:var(--habit)" data-hardrefresh="1">최신으로 새로 고침</button>
     </div>`;
 }
+function statCats(){
+  const arr=S.habits.filter(h=>alive(h));
+  const has=id=>arr.some(h=>h.catId===id);
+  return `<div class="catbar">
+    <button class="catchip ${statCat==='all'?'on':''}" data-statcat="all">전체</button>
+    ${S.cats.filter(c=>has(c.id)).map(c=>`<button class="catchip ${statCat===c.id?'on':''}" data-statcat="${c.id}">
+      <u style="color:${statCat===c.id?'var(--onAccent)':c.color}">●</u>${esc(c.name)}</button>`).join('')}
+    ${arr.some(h=>!S.cats.some(c=>c.id===h.catId))?
+      `<button class="catchip ${statCat==='none'?'on':''}" data-statcat="none">분류 없음</button>`:''}
+  </div>`;
+}
+function statHabits(){
+  const list=S.habits.filter(h=>alive(h)).filter(h=>
+    statCat==='all'?true:statCat==='none'?!S.cats.some(c=>c.id===h.catId):h.catId===statCat);
+  return list.sort((a,b)=>{
+    const ia=S.cats.findIndex(c=>c.id===a.catId), ib=S.cats.findIndex(c=>c.id===b.catId);
+    return ((ia<0?99:ia)-(ib<0?99:ib))||byOrd(a,b);
+  });
+}
+function rateOf(d,hs){
+  const a=hs.filter(h=>habDays(h).includes(dow(d))&&!isSkip(d,h.id));
+  return a.length?a.filter(h=>isDone(d,h.id)).length/a.length:null;
+}
+function avgOf(days,hs){
+  const v=days.map(d=>rateOf(d,hs)).filter(x=>x!==null);
+  return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;
+}
 function statYMlabel(){
   const [y,m]=statYM.split('-').map(Number);
   return `${y}년 ${m}월`;
@@ -1959,53 +1988,49 @@ function statWeek(){
   const t=today();
   const mon=weekStart||monStart(t);
   const week=Array.from({length:7},(_,i)=>addDays(mon,i));
-  const done=week.filter(d=>d<=t);
-  const avg=avgRate(done);
+  const hs=statHabits();
+  const avg=avgOf(week.filter(d=>d<=t),hs);
   const prevW=addDays(mon,-7), nextW=addDays(mon,7);
   const canNext=nextW<=monStart(t);
-  const hs=S.habits;
-  return `<div class="card">
+  const label=statCat==='all'?'전체':statCat==='none'?'분류 없음':catOf(statCat).name;
+  return statCats()+`<div class="card">
       <div class="calnav"><button data-week="${prevW}">‹</button>
         <b>${md(mon)} – ${md(addDays(mon,6))}</b>
         ${canNext?`<button class="r" data-week="${nextW}">›</button>`
           :'<button class="r" disabled style="opacity:.3">›</button>'}</div>
       <div style="padding:2px 16px 8px;font-size:13px;color:var(--muted)">
-        이번 주 달성률 <b style="color:var(--ink);font-size:15px;font-weight:750">${avg===null?'—':Math.round(avg*100)+'%'}</b></div>
+        ${esc(label)} 달성률 <b style="color:var(--ink);font-size:15px;font-weight:750">${avg===null?'—':Math.round(avg*100)+'%'}</b></div>
       <div class="wk">
         <div class="wkh"><span></span>${week.map(d=>
           `<i class="${d===t?'td':''}">${DAYS[dow(d)]}</i>`).join('')}</div>
-        ${hs.length?hs.map(h=>{
-          const c=catOf(h.catId);
-          return `<div class="wkr"><span>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</span>${week.map(d=>{
+        ${hs.length?hs.map(h=>
+          `<div class="wkr"><span>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</span>${week.map(d=>{
             const sch=habDays(h).includes(dow(d));
             const dn=isDone(d,h.id);
             const cls=dn?'on':(!sch?'off':(isSkip(d,h.id)?'sk':(d>t?'sch':'miss')));
-            return `<i class="${cls}" style="${dn?`background:${c.color}`:''}"></i>`;
-          }).join('')}</div>`;
-        }).join(''):'<div class="empty">습관을 추가하면 여기에 표가 생겨요.</div>'}
+            return `<i class="${cls}"></i>`;
+          }).join('')}</div>`).join(''):'<div class="empty">이 분류에 습관이 없어요.</div>'}
       </div>
-      <div class="wkl">지킴 <i class="on" style="background:var(--habit)"></i>
+      <div class="wkl">지킴 <i class="on"></i>
         놓침 <i class="miss"></i> 쉼 <i class="sk"></i> 없는 요일 <i class="off"></i></div>
-    </div>
-    <div class="card"><header><h2>분류별</h2><span class="count">이번 주</span></header>
-      <div style="padding:6px 0 14px">${catRows()}</div></div>`;
+    </div>`;
 }
-
 
 /* ── 월간: 습관마다 달력 카드 ── */
 function statMonthView(){
   const [y,m]=statYM.split('-').map(Number);
   const days=Array.from({length:daysIn(statYM)},(_,i)=>`${statYM}-${pad(i+1)}`);
   const past=days.filter(d=>d<=today());
-  const avg=avgRate(past);
+  const hsF=statHabits();
+  const avg=avgOf(past,hsF);
   const prevM=m===1?`${y-1}-12`:`${y}-${pad(m-1)}`;
   const nextM=m===12?`${y+1}-01`:`${y}-${pad(m+1)}`;
   const canNext=nextM<=monthOf(today());
-  const totalChecks=past.reduce((a,d)=>a+Object.keys(log(d).habits||{}).length,0);
-  const perfect=past.filter(d=>rate(d)===1).length;
+  const totalChecks=past.reduce((a,d)=>a+hsF.filter(h=>isDone(d,h.id)).length,0);
+  const perfect=past.filter(d=>rateOf(d,hsF)===1).length;
   const spent=sum(moneyIn(statYM).filter(r=>r.type==='out'),r=>r.amount);
 
-  return `<div class="card">
+  return statCats()+`<div class="card">
       <div class="calnav"><button data-smonth="${prevM}">‹</button><b>${statYMlabel()}</b>
         ${canNext?`<button class="r" data-smonth="${nextM}">›</button>`
           :'<button class="r" disabled style="opacity:.3">›</button>'}</div>
@@ -2021,10 +2046,8 @@ function statMonthView(){
           <div style="font-size:12px;color:var(--muted)">지출<b style="display:block;font-size:15px;color:var(--ink)">${shortWon(spent)}원</b></div>
         </div>
       </div></div>
-    ${S.habits.length?`<div class="hgrid">${S.habits.map(h=>habitMonthCard(h,statYM)).join('')}</div>`
-      :'<div class="card"><div class="empty">습관을 추가하면 달력이 채워져요.</div></div>'}
-    <div class="card"><header><h2>분류별</h2><span class="count">${statYMlabel()}</span></header>
-      <div style="padding:6px 0 14px">${catRows()}</div></div>`;
+    ${hsF.length?`<div class="hgrid">${hsF.map(h=>habitMonthCard(h,statYM)).join('')}</div>`
+      :'<div class="card"><div class="empty">이 분류에 습관이 없어요.</div></div>'}`;
 }
 function habitMonthCard(h,ym){
   const c=catOf(h.catId);
@@ -2116,18 +2139,6 @@ function statGreen(){
 }
 
 
-function catRows(){
-  const range=statRange();
-  if(!S.cats.length) return '<div class="empty">분류가 없어요.</div>';
-  return S.cats.map(c=>{
-    const hs=S.habits.filter(h=>h.catId===c.id);
-    const sch=hs.flatMap(h=>range.filter(d=>habDays(h).includes(dow(d))).map(d=>({h,d})));
-    const p=sch.length?Math.round(sch.filter(({h,d})=>isDone(d,h.id)).length/sch.length*100):0;
-    return `<div class="prow"><b><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</b>
-      <span class="bar"><i style="width:${p}%;background:${c.color}"></i></span>
-      <small>${sch.length?p+'%':'—'}</small></div>`;
-  }).join('');
-}
 function habitStatRows(){
   const range=statRange();
   if(!S.habits.length) return '<div class="empty">습관을 추가하면 여기에 쌓여요.</div>';
@@ -2601,7 +2612,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -2615,6 +2626,7 @@ document.addEventListener('click',ev=>{
   if(d.cfilter){catFilter=d.cfilter;render();return}
   if(d.selday){view=d.selday;render();return}
   if(d.goday){view=d.goday;tab='today';render();window.scrollTo(0,0);return}
+  if(d.statcat){statCat=d.statcat;render();return}
   if(d.gonote){view=d.gonote;tab='today';homeTab='note';render();window.scrollTo(0,0);return}
   if(d.gotocal){view=d.gotocal;calMonth=monthOf(view);tab='cal';render();window.scrollTo(0,0);return}
   if(d.export){exportICS();return}
