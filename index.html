@@ -525,7 +525,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v49';
+const APP_VER='v50';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -908,6 +908,9 @@ const effTimeDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.t)?b.t:(h.time||'')};
 const effMinDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.m)?b.m:(h.min||0)};
 const effMin=(h,d)=>effMinDow(h,dow(d));
 const roundOf=(h,i)=>((h.rounds&&h.rounds[i])||{});
+/* 회차마다 하는 요일을 따로 정했으면 그 요일에만 나온다 */
+const rOnDow=(h,i,dw)=>{const r=roundOf(h,i);return !(r.dd&&r.dd.length)||r.dd.indexOf(dw)>=0};
+const rOn=(h,i,d)=>rOnDow(h,i,dow(d));
 const rGroupDow=(h,i,dw)=>{
   const r=roundOf(h,i);
   if(r.xd&&r.xd.indexOf(dw)>=0&&typeof r.xg==='string') return r.xg;
@@ -967,7 +970,7 @@ function occOn(d){
   S.habits.forEach(h=>{
     if(!alive(h)||!onDay(h,d)||!inMode(modeOf(h),d)) return;
     const t=habTimes(h.id);
-    for(let i=0;i<t;i++) out.push({h,i});
+    for(let i=0;i<t;i++) if(rOn(h,i,d)) out.push({h,i});
   });
   return out;
 }
@@ -1042,6 +1045,7 @@ function alarmsFor(d){
     if(!onDay(h,d)||!inMode(modeOf(h),d)) return;
     const t=habTimes(h.id);
     for(let i=0;i<t;i++){
+      if(!rOn(h,i,d)) continue;
       const ht=rTime(h,i,d);
       if(!ht) continue;
       out.push({key:'h'+h.id+'_'+i,at:toMin(ht)-+h.notify,
@@ -1302,6 +1306,7 @@ function pushSchedule(){
         if(d>limit) break;
         if(!onDay(h,d)) continue;
         for(let k=0;k<tms;k++){
+          if(!rOn(h,k,d)) continue;
           const ht=rTime(h,k,d); if(!ht) continue;
           const at=toMin(ht)-+h.notify; if(at<0) continue;
           dated.push({k:'h'+h.id+'_'+k,date:d,at:toTime(at),
@@ -1312,6 +1317,7 @@ function pushSchedule(){
       for(let k=0;k<tms;k++){
         const map={};
         habDays(h).forEach(dw=>{
+          if(!rOnDow(h,k,dw)) return;
           const ht=rTimeDow(h,k,dw); if(!ht) return;
           const at=toMin(ht)-+h.notify; if(at<0) return;
           (map[at]=map[at]||[]).push(dw);
@@ -1819,6 +1825,7 @@ function mgmtRow(h,i,arr){
       <span class="info"><b>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</b>
         <small>${[esc(c.name),
         h.times>1?`하루 ${h.times}회`:'',
+        (h.rounds||[]).some(r=>r&&r.dd&&r.dd.length)?'회차별 요일':'',
         h.time?h.time:'',
         h.min?h.min+'분':'',
         (h.from||h.to)?`${h.from?md(h.from):''}~${h.to?md(h.to):''}`:'',
@@ -2649,8 +2656,12 @@ function habSheet(gid,id){
                 <label><u>소요</u><input id="rm${i}" type="number" min="0" step="5" placeholder="분" value="${r.m||''}"></label>
               </span>
               <span class="vd"></span>
-              <details class="xsec" ${hasX?'open':''}><summary>이 회차만 특정 요일 다르게${hasX?' ·  켜짐':''}</summary>
+              <details class="xsec" ${(hasX||(r.dd&&r.dd.length))?'open':''}><summary>이 회차만 따로 설정${(hasX||(r.dd&&r.dd.length))?' · 켜짐':''}</summary>
                 <span class="xrow">
+                  <u style="margin:2px 0 5px">이 회차를 하는 요일 (전부 끄면 습관 요일을 따릅니다)</u>
+                  <span class="xd">${DAYS.map((dn3,dw)=>
+                    `<button type="button" data-rd="${i}:${dw}" class="${(!r.dd||!r.dd.length||r.dd.indexOf(dw)>=0)?'on':''}">${dn3}</button>`).join('')}</span>
+                  <u style="margin:9px 0 5px">아래 요일만 묶음·시각을 다르게</u>
                   <span class="xd">${DAYS.map((dn2,dw)=>
                     `<button type="button" data-rx="${i}:${dw}" class="${(r.xd||[]).indexOf(dw)>=0?'on':''}">${dn2}</button>`).join('')}</span>
                   <span class="xt3">
@@ -2913,7 +2924,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -2927,7 +2938,7 @@ document.addEventListener('click',ev=>{
   if(d.cfilter){catFilter=d.cfilter;render();return}
   if(d.selday){view=d.selday;render();return}
   if(d.goday){view=d.goday;tab='today';render();window.scrollTo(0,0);return}
-  if(d.rx){
+  if(d.rx||d.rd){
     el.classList.toggle('on');
     return;
   }
@@ -3107,6 +3118,9 @@ document.addEventListener('click',ev=>{
           if(gv!=='-') e.g=gv;
           if(tv) e.t=tv;
           if(mv) e.m=mv;
+          const dd=[];
+          document.querySelectorAll('[data-rd^="'+i+':"].on').forEach(b=>dd.push(+b.dataset.rd.split(':')[1]));
+          if(dd.length&&dd.length<7) e.dd=dd.sort();
           const xd=[];
           document.querySelectorAll('[data-rx^="'+i+':"].on').forEach(b=>xd.push(+b.dataset.rx.split(':')[1]));
           const xt=$('#rxt'+i).value, xm=+$('#rxm'+i).value||0, xg=$('#rxg'+i).value;
