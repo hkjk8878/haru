@@ -516,7 +516,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v45';
+const APP_VER='v46';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -974,6 +974,7 @@ const habitsOfGroupOn=(gid,d)=>{
   return occOfGroup(gid,d).filter(o=>seen[o.h.id]?false:(seen[o.h.id]=true)).map(o=>o.h);
 };
 const byGord=(a,b)=>(a.gord||0)-(b.gord||0);
+const groupsSorted=()=>S.groups.slice().sort(byGord);
 const groupsOn=d=>S.groups.filter(g=>inMode(g.mode,d)&&habitsOfGroupOn(g.id,d).length)
   .sort((a,b)=>{
     const t=((a.time||'99:99')<(b.time||'99:99'))?-1:((a.time||'99:99')>(b.time||'99:99')?1:0);
@@ -1799,8 +1800,8 @@ function mgmtRow(h,i,arr){
         st>1?`🔥${st}`:''].filter(Boolean).join(' · ')}</small></span>
       <span class="week">${grid}</span></button>
     ${many?`<span class="mvs">
-      <button data-mvhab="${h.id}:-1" ${i===0?'disabled':''} aria-label="위로">▲</button>
-      <button data-mvhab="${h.id}:1" ${i===arr.length-1?'disabled':''} aria-label="아래로">▼</button></span>`
+      <button ${i===0?'disabled':`data-swap="${h.id}:${(arr[i-1]||{}).id}:-1"`} aria-label="위로">▲</button>
+      <button ${i===arr.length-1?'disabled':`data-swap="${h.id}:${(arr[i+1]||{}).id}:1"`} aria-label="아래로">▼</button></span>`
       :'<span class="chev">›</span>'}
   </div>`;
 }
@@ -2439,7 +2440,7 @@ function addGrpSheet(gid){
 function pickGrpSheet(){
   openSheet(`<h2>어느 루틴에 넣을까요</h2>
     <p class="hint">고르면 새 습관 만들기로 이어집니다.</p>
-    ${S.groups.map(g=>`<button class="lvrow" data-newhab="${g.id}">
+    ${groupsSorted().map(g=>`<button class="lvrow" data-newhab="${g.id}">
       <b class="lvb plus">${g.time||'—'}</b><span>${esc(g.name)}
       <small style="color:var(--muted);font-size:12px;display:block">습관 ${S.habits.filter(h=>h.groupId===g.id).length}개</small></span></button>`).join('')}
     <div class="actions"><button class="cancel" style="flex:1;text-align:center" data-close="1">닫기</button></div>`);
@@ -2560,7 +2561,7 @@ function habSheet(gid,id){
 
     <div class="field"><label for="f-grp">어디에 넣을까요</label><select id="f-grp">
       <option value="" ${solo?'selected':''}>따로 하기 (묶음 없음)</option>
-      ${S.groups.map(x=>`<option value="${x.id}" ${g&&x.id===g.id?'selected':''}>${esc(x.name)} 묶음</option>`).join('')}
+      ${groupsSorted().map(x=>`<option value="${x.id}" ${g&&x.id===g.id?'selected':''}>${esc(x.name)} 묶음</option>`).join('')}
       </select></div>
 
     <div class="field" id="ownWrap" style="display:${solo?'none':'block'}">
@@ -2594,7 +2595,7 @@ function habSheet(gid,id){
                   <select id="rg${i}">
                     <option value="-" ${typeof r.g!=='string'?'selected':''}>기본값 그대로</option>
                     <option value="" ${r.g===''?'selected':''}>따로 하기</option>
-                    ${S.groups.map(x=>`<option value="${x.id}" ${r.g===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}
+                    ${groupsSorted().map(x=>`<option value="${x.id}" ${r.g===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}
                   </select></label>
                 <label><u>시각</u><input id="rt${i}" type="time" value="${r.t||''}"></label>
                 <label><u>소요</u><input id="rm${i}" type="number" min="0" step="5" placeholder="분" value="${r.m||''}"></label>
@@ -2608,7 +2609,7 @@ function habSheet(gid,id){
                     <select id="rxg${i}">
                       <option value="-" ${typeof r.xg!=='string'?'selected':''}>묶음 그대로</option>
                       <option value="" ${r.xg===''?'selected':''}>따로 하기</option>
-                      ${S.groups.map(x=>`<option value="${x.id}" ${r.xg===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}
+                      ${groupsSorted().map(x=>`<option value="${x.id}" ${r.xg===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}
                     </select>
                     <input id="rxt${i}" type="time" value="${r.xt||''}">
                     <input id="rxm${i}" type="number" min="0" step="5" placeholder="분" value="${r.xm||''}">
@@ -2642,7 +2643,7 @@ function habSheet(gid,id){
                   <select id="vg${i}">
                     <option value="-" ${(!b2||typeof b2.g!=='string')?'selected':''}>기본값 그대로</option>
                     <option value="" ${(b2&&b2.g==='')?'selected':''}>따로 하기</option>
-                    ${S.groups.map(x=>`<option value="${x.id}" ${(b2&&b2.g===x.id)?'selected':''}>${esc(x.name)}</option>`).join('')}
+                    ${groupsSorted().map(x=>`<option value="${x.id}" ${(b2&&b2.g===x.id)?'selected':''}>${esc(x.name)}</option>`).join('')}
                   </select></label>
                 <label><u>시각</u><input id="vt${i}" type="time" value="${b2&&b2.t?b2.t:''}"></label>
                 <label><u>소요</u><input id="vm${i}" type="number" min="0" step="5" placeholder="분" value="${b2&&b2.m?b2.m:''}"></label>
@@ -2863,7 +2864,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -3276,17 +3277,14 @@ document.addEventListener('click',ev=>{
     $('#f-newcat').value=''; $('#catNew').style.display='none';
     return;
   }
-  if(d.mvhab){
-    const [hid,dir]=d.mvhab.split(':');
-    const h=S.habits.find(x=>x.id===hid);
-    if(h){
-      const sibs=S.habits.filter(x=>(x.groupId||'')===(h.groupId||'')).sort(byOrd);
-      sibs.forEach((x,i)=>{x.ord=i});
-      const i=sibs.indexOf(h), j=i+(+dir);
-      if(j>=0&&j<sibs.length){
-        const t=sibs[i].ord; sibs[i].ord=sibs[j].ord; sibs[j].ord=t;
-        save();render();
-      }
+  if(d.swap){
+    const [ia,ib]=d.swap.split(':');
+    const A=habById(ia), B=habById(ib);
+    if(A&&B&&A!==B){
+      /* 먼저 현재 보이는 순서대로 번호를 다시 매긴 뒤 두 개를 맞바꾼다 */
+      S.habits.slice().sort(byOrd).forEach((x,k)=>{x.ord=k});
+      const t=A.ord; A.ord=B.ord; B.ord=t;
+      save();render();
     }
     return;
   }
