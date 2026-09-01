@@ -431,9 +431,18 @@ nav button.on{color:var(--ink)}
 .field input.amt{font-size:24px;font-weight:750;letter-spacing:-.02em;padding:12px}
 .row2{display:flex;gap:10px}
 .row2 .field{flex:1}
-.vrow{display:grid;grid-template-columns:26px 1fr 96px;gap:7px;align-items:center;margin-bottom:6px}
-.vrow span{font-size:12.5px;font-weight:650;color:var(--muted);text-align:center}
-.vrow select,.vrow input{padding:8px 9px !important;font-size:13px !important;margin:0}
+.vrow{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;
+  margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.vrow .vd{font-size:13px;font-weight:750;color:var(--muted);text-align:center;padding-top:16px}
+.vrow.set .vd{color:var(--habit)}
+.vrow .vb{display:grid;grid-template-columns:minmax(0,1fr) 92px 66px;gap:6px}
+.vrow label{display:block;min-width:0}
+.vrow label u{display:block;text-decoration:none;font-size:10px;font-weight:650;color:var(--muted);
+  margin:0 0 3px 2px}
+.vrow select,.vrow input{width:100%;min-width:0;padding:9px 8px;font-size:13px;margin:0;
+  border:1.5px solid var(--line);border-radius:10px;background:var(--card2);color:var(--ink)}
+.vrow select{-webkit-appearance:none;appearance:none;padding-right:8px}
+.vrow input::placeholder{color:var(--muted)}
 .dayspick{display:flex;gap:5px}
 .dayspick button{flex:1;height:38px;border-radius:11px;background:var(--card2);text-align:center;
   font-size:13px;font-weight:650;color:var(--muted)}
@@ -484,7 +493,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v36';
+const APP_VER='v39';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -863,6 +872,8 @@ const inRange=(h,d)=>(!h.from||d>=h.from)&&(!h.to||d<=h.to);
 const bd=(h,dw)=>(h.byDay&&h.byDay[dw])||null;
 const effGroupDow=(h,dw)=>{const b=bd(h,dw);return (b&&typeof b.g==='string')?b.g:(h.groupId||'')};
 const effTimeDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.t)?b.t:(h.time||'')};
+const effMinDow=(h,dw)=>{const b=bd(h,dw);return (b&&b.m)?b.m:(h.min||0)};
+const effMin=(h,d)=>effMinDow(h,dow(d));
 const effGroup=(h,d)=>effGroupDow(h,dow(d));
 const effTime=(h,d)=>effTimeDow(h,dow(d));
 const hasByDay=h=>!!(h.byDay&&Object.keys(h.byDay).length);
@@ -894,6 +905,10 @@ function inMode(mv,d){
 }
 const modeOf=h=>h.mode||((grpOf(h.groupId)||{}).mode||'');
 const habitsOfGroup=gid=>S.habits.filter(h=>h.groupId===gid).sort(byOrd);
+const inGroupAny=(h,gid)=>h.groupId===gid||
+  (h.byDay&&Object.keys(h.byDay).some(k=>h.byDay[k].g===gid));
+const habitsOfGroupAny=gid=>S.habits.filter(h=>inGroupAny(h,gid)).sort(byOrd);
+const noGroupAny=h=>!h.groupId&&!(h.byDay&&Object.keys(h.byDay).some(k=>typeof h.byDay[k].g==='string'&&h.byDay[k].g));
 const habitsOfGroupOn=(gid,d)=>S.habits
   .filter(h=>alive(h)&&effGroup(h,d)===gid&&onDay(h,d)&&inMode(modeOf(h),d))
   .sort(byOrd);
@@ -1366,7 +1381,7 @@ function habitRow(h){
   const tm=et?`<em class="tm2">${et}</em>`:'';
   return `<div class="hb ${dn?'done':''} ${sk?'skip':''}" style="border-left-color:${c.color}">
     <button class="main" data-${lvs.length&&!dn?'lvpick':'hab'}="${h.id}"><span class="tick">✓</span>
-      <span class="nm">${tm}<span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(label)}</span>${h.min?`<em class="mn">${h.min}분</em>`:''}</span></button>
+      <span class="nm">${tm}<span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(label)}</span>${effMin(h,view)?`<em class="mn">${effMin(h,view)}분</em>`:''}</span></button>
     ${right}</div>`;
 }
 function evRow(e,d){
@@ -1496,7 +1511,7 @@ function tabRoutine(){
           <button class="ln" data-${tag}="${h.id}" style="border-left-color:${c.color}">
             <span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(curLv?curLv[2]:h.name)}</span>
             ${h.track&&v?`<em class="mn">${esc(v)}${esc(h.unit||'')}</em>`:''}
-            ${h.min?`<em class="mn">${h.min}분</em>`:''}
+            ${effMin(h,view)?`<em class="mn">${effMin(h,view)}분</em>`:''}
             ${h.streakOn!==false&&st>0?`<em class="mn">🔥${st}</em>`:''}
             ${sk?'<em class="lrest">쉼</em>':''}
             ${(h.times>1&&!sk)?`<em class="mn">${doneN(view,h.id)}/${h.times}</em>`:''}</button>
@@ -1607,7 +1622,7 @@ function vRoutine(){
   const gsAll=S.groups.slice().sort(byGord);
   if(routineMode==='group'){
     body=gsAll.map(g=>{
-      const hs=habitsOfGroup(g.id).filter(filter);
+      const hs=habitsOfGroupAny(g.id).filter(filter);
       if(catFilter!=='all'&&!hs.length) return '';
       const gi=gsAll.indexOf(g);
       return `<div class="card">
@@ -1644,7 +1659,7 @@ function vRoutine(){
     <div class="seg">
       <button data-rmode="group" class="${routineMode==='group'?'on':''}">묶음별</button>
       <button data-rmode="cat" class="${routineMode==='cat'?'on':''}">분류별</button></div></div>`+body+
-    `${routineMode==='cat'?'':(()=>{const so=S.habits.filter(h=>!h.groupId&&(catFilter==='all'||h.catId===catFilter)).sort(byOrd);
+    `${routineMode==='cat'?'':(()=>{const so=S.habits.filter(h=>noGroupAny(h)&&(catFilter==='all'||h.catId===catFilter)).sort(byOrd);
       return `<div class="card"><header><h2>따로 하는 습관</h2>
         <span class="count">${so.length}개</span>
         <button class="add" style="color:var(--habit)" data-newsolo="1">＋ 추가</button></header>
@@ -1678,6 +1693,15 @@ function vRoutine(){
 
     `;
 }
+function byDaySummary(h){
+  const out=[];
+  for(let i=0;i<7;i++){
+    const b=bd(h,i); if(!b) continue;
+    const g=(typeof b.g==='string')?(b.g?(grpOf(b.g)||{}).name||'?':'따로'):null;
+    out.push(DAYS[i]+(g?' '+g:'')+(b.t?' '+b.t:''));
+  }
+  return out.length?out.join(' / '):'요일별 다름';
+}
 function mgmtRow(h,i,arr){
   const c=catOf(h.catId), st=streak(h), g=grpOf(h.groupId);
   const wk=Array.from({length:7},(_,x)=>addDays(monStart(today()),x));
@@ -1689,7 +1713,7 @@ function mgmtRow(h,i,arr){
   return `<div class="mrow" style="border-left-color:${c.color}">
     <button class="minfo" data-edithab="${h.id}">
       <span class="info"><b>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</b>
-        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${hasByDay(h)?' · 요일별 다름':''}${st>1?` · 🔥${st}`:''}</small></span>
+        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${hasByDay(h)?' · '+byDaySummary(h):''}${st>1?` · 🔥${st}`:''}</small></span>
       <span class="week">${grid}</span></button>
     ${many?`<span class="mvs">
       <button data-mvhab="${h.id}:-1" ${i===0?'disabled':''} aria-label="위로">▲</button>
@@ -2320,11 +2344,11 @@ function addGrpSheet(gid){
         return `<div class="lvrow" style="gap:8px">
           <b class="lvb" style="background:${c.color};color:var(--onAccent)">${h.icon||'·'}</b>
           <span>${esc(h.name)}<small style="display:block;font-size:12px;color:var(--muted)">지금 ${og?esc(og.name):'따로 하기'}</small></span>
-          <button class="mact" data-copyhab="${gid}:${h.id}">복사</button>
-          <button class="medit" data-movehab="${gid}:${h.id}">옮기기</button>
+          <button class="mact" data-movehab="${gid}:${h.id}">옮기기</button>
         </div>`;
       }).join('')}
-      <p class="hint" style="margin:6px 0 0">복사는 양쪽에서 따로 체크되고, 옮기기는 이 루틴으로 이동합니다.</p>`:''}
+      <p class="hint" style="margin:6px 0 0">요일마다 다른 루틴에 넣고 싶으면, 습관을 눌러 <b>요일별로 다르게</b>를 쓰세요.
+        복사하면 목록이 중복돼요.</p>`:''}
     <div class="actions"><button class="cancel" style="flex:1;text-align:center" data-close="1">닫기</button></div>`);
 }
 function pickGrpSheet(){
@@ -2460,18 +2484,23 @@ function habSheet(gid,id){
     <div id="varyBox" style="display:${h&&hasByDay(h)?'block':'none'};margin-bottom:13px">
       ${DAYS.map((dn,i)=>{
         const b=h&&h.byDay?h.byDay[i]:null;
-        return `<div class="vrow" data-vd="${i}">
-          <span>${dn}</span>
-          <select id="vg${i}">
-            <option value="" ${(b&&b.g==='')?'selected':''}>따로</option>
-            ${S.groups.map(x=>`<option value="${x.id}" ${(b&&b.g===x.id)?'selected':''}>${esc(x.name)}</option>`).join('')}
-            <option value="-" ${(!b||typeof b.g!=='string')?'selected':''}>기본값</option>
-          </select>
-          <input id="vt${i}" type="time" value="${b&&b.t?b.t:''}">
+        const has=!!(b&&(typeof b.g==='string'||b.t||b.m));
+        return `<div class="vrow ${has?'set':''}">
+          <span class="vd">${dn}</span>
+          <span class="vb">
+            <label><u>어디에</u>
+              <select id="vg${i}">
+                <option value="-" ${(!b||typeof b.g!=='string')?'selected':''}>기본값 그대로</option>
+                <option value="" ${(b&&b.g==='')?'selected':''}>따로 하기</option>
+                ${S.groups.map(x=>`<option value="${x.id}" ${(b&&b.g===x.id)?'selected':''}>${esc(x.name)}</option>`).join('')}
+              </select></label>
+            <label><u>시각</u><input id="vt${i}" type="time" value="${b&&b.t?b.t:''}"></label>
+            <label><u>소요</u><input id="vm${i}" type="number" min="0" step="5" placeholder="분" value="${b&&b.m?b.m:''}"></label>
+          </span>
         </div>`;
       }).join('')}
-      <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">비워 둔 요일은 위에서 정한 기본 묶음·시각을 씁니다.
-        복사해서 여러 개 만들 필요 없어요.</p>
+      <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">비워 둔 요일은 아래 기본 묶음·시각을 씁니다.
+        알림을 켜두면 요일마다 그 시각에 각각 오고, 시각이 요일에도 기본에도 없으면 그 요일은 알림이 없습니다.</p>
     </div>
     <div id="soloBox">
       <div class="row2"><div class="field"><label for="f-time2">이 습관 시각</label>
@@ -2480,7 +2509,9 @@ function habSheet(gid,id){
           <input id="f-min" type="number" min="0" step="5" value="${h&&h.min?h.min:''}" placeholder="10"></div></div>
       <p style="margin:-6px 0 13px;font-size:12px;color:var(--muted)">비우면 묶음 시각을 따릅니다.
         여기에 시각을 넣으면 목록 보기에서 그 시각 순서로 놓여요.</p>
-      ${notifySelect(h?h.notify:'','알림 (시각이 있을 때만)')}
+      ${notifySelect(h?h.notify:'','알림')}
+      <p style="margin:-6px 0 4px;font-size:12px;color:var(--muted)">요일별 시각을 넣었으면 그 시각에,
+        안 넣은 요일은 위 기본 시각에 알림이 옵니다.</p>
     </div>
     <div class="field"><label>기간 (비우면 계속)</label>
       <div class="row2"><div class="field" style="margin:0"><input id="f-hfrom" type="date" value="${h?h.from||'':''}"></div>
@@ -2845,8 +2876,13 @@ document.addEventListener('click',ev=>{
     if(own&&!sheetDays.length) return showErr('요일을 하나 이상 골라 주세요.');
     const hf=$('#f-hfrom').value, ht=$('#f-hto').value;
     if(hf&&ht&&ht<hf) return showErr('기간의 끝이 시작보다 빠를 수 없어요.');
-    if($('#f-notify').value&&!$('#f-time2').value)
-      return showErr('알림을 쓰려면 이 습관 시각을 정해 주세요.');
+    if($('#f-notify').value){
+      let anyT=!!$('#f-time2').value;
+      if($('#f-vary').value==='1'){
+        for(let i=0;i<7;i++) if($('#vt'+i).value) anyT=true;
+      }
+      if(!anyT) return showErr('알림을 쓰려면 기본 시각이나 요일별 시각 중 하나는 넣어 주세요.');
+    }
     const gid2=$('#f-grp').value;
     const o={name,catId:sheetPick.cat||'',groupId:gid2,
       icon:$('#f-icon').value.trim().slice(0,2),
@@ -2861,11 +2897,12 @@ document.addEventListener('click',ev=>{
         if($('#f-vary').value!=='1') return {};
         const o={};
         for(let i=0;i<7;i++){
-          const gv=$('#vg'+i).value, tv=$('#vt'+i).value;
-          if(gv==='-'&&!tv) continue;
+          const gv=$('#vg'+i).value, tv=$('#vt'+i).value, mv=+$('#vm'+i).value||0;
+          if(gv==='-'&&!tv&&!mv) continue;
           const e={};
           if(gv!=='-') e.g=gv;
           if(tv) e.t=tv;
+          if(mv) e.m=mv;
           if(Object.keys(e).length) o[i]=e;
         }
         return o;
