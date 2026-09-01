@@ -525,7 +525,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v50';
+const APP_VER='v51';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1629,7 +1629,8 @@ function tabRoutine(){
     return `<div class="grp ${full?'full':''}">
       <div class="gh">${ring(act.length?done/act.length:0)}
         <button class="t" data-fold="${g.id}"><b>${esc(g.name)} <i class="fx">${col?'▾':'▴'}</i></b>
-          <small>${g.time?g.time+' · ':''}${g.min?g.min+'분 · ':''}${done}/${act.length} 완료${occ.length>act.length?` · 쉼 ${occ.length-act.length}`:''}${g.notify?' · 🔔':''}${full?' · 오늘 끝!':''}</small></button>
+          <small>${g.time?(g.min?`${g.time} → ${toTime(toMin(g.time)+g.min)} (${g.min}분) · `:g.time+' · ')
+            :(g.min?g.min+'분 · ':'')}${done}/${act.length} 완료${occ.length>act.length?` · 쉼 ${occ.length-act.length}`:''}${g.notify?' · 🔔':''}${full?' · 오늘 끝!':''}</small></button>
         <button class="allbtn" data-allgrp="${g.id}">${full?'되돌리기':'모두 체크'}</button></div>
       ${col?'':occ.map(habitRow).join('')+
         `<button class="addbtn" style="color:var(--habit)" data-addgrp="${g.id}">＋ 이 루틴에 습관 넣기</button>`}</div>`;
@@ -1746,7 +1747,7 @@ function vRoutine(){
       const gi=gsAll.indexOf(g);
       return `<div class="card">
         <header><h2>${esc(g.name)}</h2>
-          <span class="count">${g.time||'시각 없음'} · ${g.days.length===7?'매일':g.days.map(d=>DAYS[d]).join(' ')}</span>
+          <span class="count">${g.time?(g.min?`${g.time}–${toTime(toMin(g.time)+g.min)}`:g.time):'시각 없음'} · ${g.days.length===7?'매일':g.days.map(d=>DAYS[d]).join(' ')}</span>
           ${gsAll.length>1?`<span class="mvs" style="margin-left:auto">
             <button data-mvgrp="${g.id}:-1" ${gi===0?'disabled':''}>▲</button>
             <button data-mvgrp="${g.id}:1" ${gi===gsAll.length-1?'disabled':''}>▼</button></span>`:''}
@@ -2583,6 +2584,8 @@ function grpSheet(id){
         <input id="f-time" type="time" value="${g?g.time||'':''}"></div>
       <div class="field"><label for="f-min">소요 (분)</label>
         <input id="f-min" type="number" min="0" step="5" value="${g&&g.min?g.min:''}" placeholder="15"></div></div>
+    <p class="hint" style="margin:-6px 0 13px">시각과 소요를 넣으면 끝나는 시각을 계산해서 보여줍니다.
+      (07:00 · 35분 → 07:00 → 07:35)</p>
     ${notifySelect(g?g.notify:'','알림 (시각이 있을 때만)')}
     <div class="field"><label>실천 요일</label>${daysPicker()}</div>
     ${modeSelect(g?g.mode:'')}
