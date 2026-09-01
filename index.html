@@ -246,7 +246,16 @@ input,select,textarea{font:inherit;color:inherit}
 .gth .gt{flex:1;min-width:0}
 .gth .gt b{font-size:16px;font-weight:720}
 .gth .gt small{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
-.gth .pace{display:block;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.gth .pbar{display:block;position:relative;height:9px;border-radius:99px;background:var(--cell2);
+  margin-top:10px;overflow:visible}
+.gth .pbar i{display:block;height:100%;border-radius:99px;background:var(--goal);transition:width .35s}
+.gth .pbar s{position:absolute;top:-3px;width:2px;height:15px;background:var(--ink);opacity:.55;
+  text-decoration:none;border-radius:2px}
+.gth .pl{display:flex;align-items:center;gap:9px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.gth .pl .tg{margin-left:auto;font-size:11px;font-weight:750;padding:3px 8px;border-radius:999px}
+.gth .pl .tg.ok{background:var(--habit-soft);color:var(--habit)}
+.gth .pl .tg.mid{background:var(--cell2);color:var(--muted)}
+.gth .pl .tg.late{background:var(--task-soft);color:var(--task)}
 .step{display:flex;align-items:center;gap:11px;width:100%;padding:10px 16px;border-top:1px solid var(--line)}
 .step .box{width:20px;height:20px;flex:none;border-radius:6px;border:1.7px solid #574828;
   display:grid;place-items:center;font-size:11px;color:transparent}
@@ -472,7 +481,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v32';
+const APP_VER='v33';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -597,7 +606,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:17,
+    version:18,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type])=>({id,name,color,type})),
@@ -670,6 +679,7 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<18){ (d.habits||[]).forEach(h=>{h.from=h.from||''; h.to=h.to||''}); d.version=18; }
   if(d.version<17){ (d.habits||[]).forEach(h=>{h.times=h.times||1}); d.version=17; }
   if(d.version<16){ (d.groups||[]).forEach((g,i)=>{g.gord=i}); d.version=16; }
   if(d.version<15){ d.modeOverride=null; d.version=15; }
@@ -845,8 +855,10 @@ const mcatOf=id=>S.mcats.find(c=>c.id===id)||{...NOCAT,type:'out'};
 const grpOf=id=>S.groups.find(g=>g.id===id);
 const habDays=h=>h.days||((grpOf(h.groupId)||{days:[0,1,2,3,4,5,6]}).days);
 const alive=h=>!h.groupId||!!grpOf(h.groupId);
-const habitsOn=d=>S.habits.filter(h=>alive(h)&&habDays(h).includes(dow(d))&&inMode(modeOf(h),d));
-const soloOn=d=>S.habits.filter(h=>!h.groupId&&habDays(h).includes(dow(d))&&inMode(h.mode||'',d))
+const inRange=(h,d)=>(!h.from||d>=h.from)&&(!h.to||d<=h.to);
+const onDay=(h,d)=>habDays(h).includes(dow(d))&&inRange(h,d);
+const habitsOn=d=>S.habits.filter(h=>alive(h)&&onDay(h,d)&&inMode(modeOf(h),d));
+const soloOn=d=>S.habits.filter(h=>!h.groupId&&onDay(h,d)&&inMode(h.mode||'',d))
   .sort((a,b)=>{
     const t=((a.time||'99:99')<(b.time||'99:99'))?-1:((a.time||'99:99')>(b.time||'99:99')?1:0);
     return t||byOrd(a,b);
@@ -873,7 +885,7 @@ function inMode(mv,d){
 const modeOf=h=>h.mode||((grpOf(h.groupId)||{}).mode||'');
 const habitsOfGroup=gid=>S.habits.filter(h=>h.groupId===gid).sort(byOrd);
 const habitsOfGroupOn=(gid,d)=>habitsOfGroup(gid)
-  .filter(h=>habDays(h).includes(dow(d))&&inMode(modeOf(h),d));
+  .filter(h=>onDay(h,d)&&inMode(modeOf(h),d));
 const byGord=(a,b)=>(a.gord||0)-(b.gord||0);
 const groupsOn=d=>S.groups.filter(g=>inMode(g.mode,d)&&habitsOfGroupOn(g.id,d).length)
   .sort((a,b)=>{
@@ -902,7 +914,8 @@ const rate=d=>{
 function streak(h){
   let n=0,d=today(),days=habDays(h);
   for(let i=0;i<400;i++){
-    if(days.includes(dow(d))&&!isSkip(d,h.id)){
+    if(h.from&&d<h.from) break;
+    if(days.includes(dow(d))&&inRange(h,d)&&!isSkip(d,h.id)){
       if(isDone(d,h.id)) n++;
       else if(d!==today()) break;
     }
@@ -930,7 +943,7 @@ function alarmsFor(d){
   });
   S.habits.forEach(h=>{
     if(!h.time||!h.notify||!alive(h)) return;
-    if(!habDays(h).includes(dow(d))) return;
+    if(!onDay(h,d)) return;
     if(!inMode(modeOf(h),d)) return;
     out.push({key:'h'+h.id,at:toMin(h.time)-+h.notify,title:h.name+' 시간이에요',
       body:h.min?h.min+'분 예정':'',label:h.name,kind:'습관'});
@@ -1182,8 +1195,18 @@ function pushSchedule(){
     if(!h.time||!h.notify||!alive(h)) return;
     const at=toMin(h.time)-+h.notify;
     if(at<0) return;
-    weekly.push({k:'h'+h.id,dow:habDays(h).slice(),at:toTime(at),
-      title:h.name+' 시간이에요',body:h.min?h.min+'분 예정':''});
+    const body=h.min?h.min+'분 예정':'';
+    if(h.from||h.to){
+      for(let i=0;i<120;i++){
+        const d=addDays(t,i);
+        if(d>limit) break;
+        if(!onDay(h,d)) continue;
+        dated.push({k:'h'+h.id,date:d,at:toTime(at),title:h.name+' 시간이에요',body});
+      }
+    } else {
+      weekly.push({k:'h'+h.id,dow:habDays(h).slice(),at:toTime(at),
+        title:h.name+' 시간이에요',body});
+    }
   });
   S.events.forEach(e=>{
     if(!e.notify) return;
@@ -1645,7 +1668,7 @@ function mgmtRow(h,i,arr){
   return `<div class="mrow" style="border-left-color:${c.color}">
     <button class="minfo" data-edithab="${h.id}">
       <span class="info"><b>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</b>
-        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${st>1?` · 🔥${st}`:''}</small></span>
+        <small>${esc(c.name)}${g?' · '+esc(g.name):' · 따로'}${h.time?' · '+h.time:''}${h.min?' · '+h.min+'분':''}${(h.from||h.to)?` · ${h.from?md(h.from):''}~${h.to?md(h.to):''}`:''}${st>1?` · 🔥${st}`:''}</small></span>
       <span class="week">${grid}</span></button>
     ${many?`<span class="mvs">
       <button data-mvhab="${h.id}:-1" ${i===0?'disabled':''} aria-label="위로">▲</button>
@@ -1735,21 +1758,24 @@ function vCal(){
       <button data-newgoal="1" style="color:var(--goal)">＋ 목표</button></div>`+
     (S.goals.length?S.goals.slice().sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:1).map(g=>{
       const dn=g.due?diffDays(today(),g.due):null, p=goalProg(g);
+      const steps=g.steps||[];
+      const done=steps.filter(x=>x.done).length;
       const el=g.from&&g.due&&diffDays(g.from,g.due)>0
         ? Math.min(1,Math.max(0,diffDays(g.from,today())/diffDays(g.from,g.due))):null;
-      let pace='';
-      if(el!==null&&(g.steps||[]).length){
-        const gap=Math.round((p-el)*100);
-        pace=`기간 ${Math.round(el*100)}% 지남 · 진행 ${Math.round(p*100)}% · `+
-          (gap>=5?`<b class="up">${gap}%p 앞서요</b>`:gap<=-5?`<b class="down">${-gap}%p 뒤처져요</b>`:'속도 딱 맞아요');
+      let tag='';
+      if(el!==null&&steps.length){
+        const gap=p-el;
+        tag=gap>=0.05?'<b class="tg ok">여유 있어요</b>'
+          :gap<=-0.05?'<b class="tg late">조금 서둘러요</b>':'<b class="tg mid">속도 좋아요</b>';
       }
       return `<div class="goal"><div class="gth">
           <span class="big"><i>${dn===null?'—':dn===0?'D-DAY':dn>0?'D-'+dn:'D+'+(-dn)}</i>
             <s>${g.due?md(g.due):'날짜 없음'}</s></span>
           <button class="gt" data-editgoal="${g.id}"><b>${esc(g.title)}</b>
             ${g.note?`<small>${esc(g.note)}</small>`:''}
-            <span class="bar" style="margin-top:9px"><i style="width:${p*100}%;background:var(--goal)"></i></span>
-            ${pace?`<span class="pace">${pace}</span>`:''}</button></div>
+            <span class="pbar"><i style="width:${p*100}%"></i>${el!==null?`<s style="left:${el*100}%"></s>`:''}</span>
+            <span class="pl">${steps.length?`<span>단계 ${done}/${steps.length}</span>`:'<span>단계를 넣어 보세요</span>'}
+              ${dn!==null&&dn>0?`<span>${dn}일 남음</span>`:''}${tag}</span></button></div>
         ${(g.steps||[]).map(s=>{
           const late=s.due&&!s.done&&s.due<today();
           return `<button class="step ${s.done?'done':''} ${late?'late':''}" data-stepedit="${g.id}:${s.id}">
@@ -1965,7 +1991,7 @@ function statHabits(){
   });
 }
 function rateOf(d,hs){
-  const a=hs.filter(h=>habDays(h).includes(dow(d))&&!isSkip(d,h.id));
+  const a=hs.filter(h=>onDay(h,d)&&!isSkip(d,h.id));
   return a.length?a.filter(h=>isDone(d,h.id)).length/a.length:null;
 }
 function avgOf(days,hs){
@@ -2005,7 +2031,7 @@ function statWeek(){
           `<i class="${d===t?'td':''}">${DAYS[dow(d)]}</i>`).join('')}</div>
         ${hs.length?hs.map(h=>
           `<div class="wkr"><span>${h.icon?esc(h.icon)+' ':''}${esc(h.name)}</span>${week.map(d=>{
-            const sch=habDays(h).includes(dow(d));
+            const sch=onDay(h,d);
             const dn=isDone(d,h.id);
             const cls=dn?'on':(!sch?'off':(isSkip(d,h.id)?'sk':(d>t?'sch':'miss')));
             return `<i class="${cls}"></i>`;
@@ -2057,14 +2083,14 @@ function habitMonthCard(h,ym){
   let cells='';
   for(let i=0;i<lead;i++) cells+='<i class="e"></i>';
   days.forEach(d=>{
-    const sch=habDays(h).includes(dow(d));
+    const sch=onDay(h,d);
     const dn=isDone(d,h.id);
     const future=d>today();
     const cls=dn?'on':(!sch?'off':(isSkip(d,h.id)?'sk':(future?'fu':'miss')));
     const st=dn?`background:${c.color};color:#fff`:'';
     cells+=`<i class="${cls}" style="${st}">${+d.slice(8)}</i>`;
   });
-  const sch=days.filter(d=>habDays(h).includes(dow(d))&&d<=today()&&!isSkip(d,h.id));
+  const sch=days.filter(d=>onDay(h,d)&&d<=today()&&!isSkip(d,h.id));
   const done=sch.filter(d=>isDone(d,h.id)).length;
   const pct=sch.length?Math.round(done/sch.length*100):0;
   let extra='';
@@ -2414,6 +2440,11 @@ function habSheet(gid,id){
         여기에 시각을 넣으면 목록 보기에서 그 시각 순서로 놓여요.</p>
       ${notifySelect(h?h.notify:'','알림 (시각이 있을 때만)')}
     </div>
+    <div class="field"><label>기간 (비우면 계속)</label>
+      <div class="row2"><div class="field" style="margin:0"><input id="f-hfrom" type="date" value="${h?h.from||'':''}"></div>
+        <div class="field" style="margin:0"><input id="f-hto" type="date" value="${h?h.to||'':''}"></div></div>
+      <p style="margin:7px 0 0;font-size:12px;color:var(--muted)">시험 준비처럼 정해진 기간에만 할 습관이면 날짜를 넣어 주세요.
+        기간이 지나면 목록에서 저절로 사라집니다.</p></div>
     <div class="field"><label for="f-times">하루 반복 횟수</label>
       <input id="f-times" type="number" min="1" max="20" value="${h&&h.times>1?h.times:1}">
       <p style="margin:7px 0 0;font-size:12px;color:var(--muted)">2 이상이면 그만큼 눌러야 완료돼요.
@@ -2770,6 +2801,8 @@ document.addEventListener('click',ev=>{
     if(!name) return showErr('습관 이름을 적어 주세요.');
     const own=$('#f-own').value==='1'||!$('#f-grp').value;
     if(own&&!sheetDays.length) return showErr('요일을 하나 이상 골라 주세요.');
+    const hf=$('#f-hfrom').value, ht=$('#f-hto').value;
+    if(hf&&ht&&ht<hf) return showErr('기간의 끝이 시작보다 빠를 수 없어요.');
     if($('#f-notify').value&&!$('#f-time2').value)
       return showErr('알림을 쓰려면 이 습관 시각을 정해 주세요.');
     const gid2=$('#f-grp').value;
@@ -2781,6 +2814,7 @@ document.addEventListener('click',ev=>{
       notify:$('#f-notify').value,
       mode:$('#f-mode').value,
       times:Math.max(1,Math.min(20,+$('#f-times').value||1)),
+      from:$('#f-hfrom').value||'', to:$('#f-hto').value||'',
       track:$('#f-track').value,unit:$('#f-unit').value.trim(),streakOn:$('#f-streak').value==='1',
       lv:{mini:$('#f-mini').value.trim(),plus:$('#f-plus').value.trim(),max:$('#f-max').value.trim()}};
     if(d.savehab) Object.assign(S.habits.find(x=>x.id===d.savehab),o);
@@ -3092,7 +3126,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:17,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:18,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
