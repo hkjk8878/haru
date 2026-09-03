@@ -401,6 +401,8 @@ input,select,textarea{font:inherit;color:inherit}
 .fxrow .fi .m b{display:block;font-size:14px;font-weight:600}
 .fxrow .fi .m small{font-size:11.5px;color:var(--muted)}
 .fxrow .fi .v{font-size:14px;font-weight:700;flex:none}
+.ev .fadd{flex:none;font-size:11.5px;font-weight:700;color:var(--onAccent);background:var(--goal);
+  padding:7px 11px;border-radius:999px;align-self:center}
 .fxrow .fadd{flex:none;font-size:11.5px;font-weight:700;color:var(--onAccent);background:var(--goal);
   padding:7px 11px;border-radius:999px}
 .fxrow .fdone{flex:none;font-size:11.5px;font-weight:650;color:var(--muted);padding:7px 4px}
@@ -548,7 +550,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v64';
+const APP_VER='v66';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -673,7 +675,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:26,
+    version:27,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -704,6 +706,7 @@ function seed(){
              {id:uid(),title:'기출 5회분',due:addDays(t,30),done:false}]}],
     money:[{id:uid(),date:t,type:'out',catId:'food',amount:9500,memo:'점심'}],
     budget:1200000,
+    calViews:[],
     fixed:[{id:uid(),name:'적금',catId:'saving',amount:300000,day:25,type:'out',time:'09:00',notify:'0'}],
     notify:{on:false,fired:{}},
     push:{url:'',id:'',on:false,at:'',err:''},
@@ -747,6 +750,7 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<27){ d.calViews=[]; d.version=27; }
   if(d.version<26){ (d.fixed||[]).forEach(f=>{f.time=f.time||'09:00'; f.notify=f.notify||''}); d.version=26; }
   if(d.version<25){ d.fixed=[]; (d.mcats||[]).forEach(c=>{c.bud=c.bud||0}); d.version=25; }
   if(d.version<24){ (d.events||[]).forEach(e=>{e.notify2=e.notify2||''}); d.version=24; }
@@ -796,7 +800,7 @@ function migrate(d){
   d.logs||={}; d.notify||={on:false,fired:{}}; d.notify.fired||={};
   d.push||={url:'',id:'',on:false,at:'',err:''};
   d.sync||={room:'',on:false,rev:0,at:''};
-  d.lines||=[]; d.lineMode||='both'; d.modes||=[];
+  d.lines||=[]; d.lineMode||='both'; d.modes||=[]; d.calViews||=[];
   if(typeof d.activeModeId!=='string') d.activeModeId='';
   if(d.modeOverride===undefined) d.modeOverride=null; d.collapsed||={}; d.homeView||='card';
   return d;
@@ -1970,18 +1974,28 @@ function mgmtRow(h,i,arr){
   </div>`;
 }
 
-const cfEv=()=>calFilter==='all'||calFilter.slice(0,3)==='ev:';
-const cfCat=()=>calFilter.slice(0,3)==='ev:'?calFilter.slice(3):'';
-const cfTodo=()=>calFilter==='all'||calFilter==='todo';
-const cfMoney=()=>calFilter==='all'||calFilter==='money';
-const cfGoal=()=>calFilter==='all'||calFilter==='goal';
-const evShown=d=>eventsOn(d).filter(e=>{const c=cfCat();return cfEv()&&(!c||e.catId===c)});
+const curCV=()=>calFilter.slice(0,2)==='v:'?(S.calViews||[]).find(v=>v.id===calFilter.slice(2)):null;
+const cfEvCats=()=>{
+  if(calFilter==='all') return null;
+  const v=curCV(); if(v) return v.cats||[];
+  if(calFilter.slice(0,3)==='ev:') return [calFilter.slice(3)];
+  return [];
+};
+const cfTodo=()=>calFilter==='all'||calFilter==='todo'||!!(curCV()&&curCV().todo);
+const cfMoney=()=>calFilter==='all'||calFilter==='money'||!!(curCV()&&curCV().money);
+const cfGoal=()=>calFilter==='all'||calFilter==='goal'||!!(curCV()&&curCV().goal);
+const evShown=d=>{const cs=cfEvCats();return eventsOn(d).filter(e=>cs===null||cs.indexOf(e.catId)>=0)};
+const fixOn=d=>(S.fixed||[]).filter(f=>fixDay(f,d));
 function calFilterBar(){
-  const items=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표']];
+  const base=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표']];
   return `<div class="catbar">
-    ${items.map(([k,l])=>`<button class="catchip ${calFilter===k?'on':''}" data-calfilter="${k}">${l}</button>`).join('')}
+    ${base.map(([k,l])=>`<button class="catchip ${calFilter===k?'on':''}" data-calfilter="${k}">${l}</button>`).join('')}
+    ${(S.calViews||[]).map(v=>`<button class="catchip ${calFilter==='v:'+v.id?'on':''}" data-calfilter="v:${v.id}">
+      ${esc(v.name)}</button>`).join('')}
     ${S.ecats.map(c=>`<button class="catchip ${calFilter==='ev:'+c.id?'on':''}" data-calfilter="ev:${c.id}">
       <u style="color:${calFilter==='ev:'+c.id?'var(--onAccent)':c.color}">●</u>${esc(c.name)}</button>`).join('')}
+    <button class="catchip" data-cvsheet="${curCV()?curCV().id:''}" style="color:var(--habit)">
+      ${curCV()?'✎ 보기 수정':'＋ 보기 묶음'}</button>
   </div>`;
 }
 function vCal(){
@@ -1995,7 +2009,7 @@ function vCal(){
     const colors=[...new Set(evShown(d).map(e=>ecatOf(e.catId).color))].slice(0,2);
     const hasGoal=cfGoal()&&S.goals.some(g=>g.due===d||(g.steps||[]).some(s=>s.due===d));
     const hasTd=cfTodo()&&todosOn(d).length, r=rate(d);
-    const hasMn=cfMoney()&&moneyOn(d).length;
+    const hasMn=cfMoney()&&(moneyOn(d).length||fixOn(d).length);
     const hasNote=calFilter==='all'&&!!((S.logs[d]||{}).note||'').trim();
     cells.push(`<button class="dc ${d===view?'sel':''} ${d===today()?'tod':''}" data-selday="${d}">
       ${i}<span class="dots">
@@ -2031,8 +2045,18 @@ function vCal(){
       ${dueS.map(({g,s})=>`<div class="ev gl"><span class="tm">단계</span>
         <span class="bd"><b>${esc(s.title)}</b><small>${esc(g.title)}</small></span></div>`).join('')}
       ${evs.map(e=>evRow(e,view)).join('')}
-      ${(!evs.length&&!dueG.length&&!dueS.length&&!(cfTodo()&&todosOn(view).length)&&!(cfMoney()&&moneyOn(view).length))
+      ${(!evs.length&&!dueG.length&&!dueS.length&&!(cfTodo()&&todosOn(view).length)
+        &&!(cfMoney()&&(moneyOn(view).length||fixOn(view).length)))
         ?'<div class="empty">이 날은 비어 있어요.</div>':''}
+      ${cfMoney()?fixOn(view).map(f=>{
+        const c=mcatOf(f.catId);
+        const done=S.money.some(m=>m.fx===f.id+':'+monthOf(view));
+        return `<div class="ev" style="border-left-color:var(--goal)">
+          <span class="tm" style="color:var(--goal)">고정</span>
+          <span class="bd"><b style="font-weight:600">${esc(f.name)}</b>
+            <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(f.amount)}${done?' · 기록됨':''}</small></span>
+          ${done?'':`<button class="fadd" data-addfix="${f.id}">넣기</button>`}</div>`;
+      }).join(''):''}
       ${cfMoney()?moneyOn(view).map(mm=>{
         const c=mcatOf(mm.catId);
         return `<button class="ev" data-tx="${mm.id}" style="border-left-color:${c.color}">
@@ -2157,7 +2181,8 @@ function vMoney(){
           <button class="pill g" style="margin:11px 0 0" data-budget="1">예산 ${b?'수정':'설정'}</button>
         </div></div></div>
     <div class="card"><header><h2>분류별 지출·예산</h2>
-      <span class="count">분류를 눌러 예산 설정</span></header>
+      <span class="count">눌러서 예산 설정</span>
+      <button class="add" style="color:var(--goal)" data-newmcat="out">＋ 분류</button></header>
       ${(()=>{
         const list=S.mcats.filter(c=>c.type==='out'&&!c.sv);
         const used={}; outOnly(rows).forEach(r=>{used[r.catId]=(used[r.catId]||0)+r.amount});
@@ -2174,10 +2199,30 @@ function vMoney(){
         }).join('')}</div>`;
       })()}</div>
     ${(()=>{
+      const ins=S.mcats.filter(c=>c.type==='in');
+      const got={}; rows.filter(r=>r.type==='in').forEach(r=>{got[r.catId]=(got[r.catId]||0)+r.amount});
+      return `<div class="card"><header><h2>수입 분류</h2>
+        <span class="count">${won(inc)}</span>
+        <button class="add" style="color:var(--habit)" data-newmcat="in">＋ 분류</button></header>
+        ${ins.length?`<div style="padding:10px 0 14px">${ins.map(c=>
+          `<button class="prow" data-editmcat="${c.id}" style="width:100%">
+            <b><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</b>
+            <span class="bar"><i style="width:${inc?(got[c.id]||0)/inc*100:0}%;background:${c.color}"></i></span>
+            <small style="width:80px">${shortWon(got[c.id]||0)}</small></button>`).join('')}</div>`
+          :'<div class="empty">수입 분류가 없어요.</div>'}</div>`;
+    })()}
+    ${(()=>{
       const sv=savOnly(rows);
       const svTot=sum(sv,r=>r.amount);
+      const svc=S.mcats.filter(c=>c.type==='out'&&c.sv);
       return `<div class="card"><header><h2>저축·투자</h2>
-        <span class="count">${won(svTot)}</span></header>
+        <span class="count">${won(svTot)}</span>
+        <button class="add" style="color:var(--plan)" data-newmcat="out">＋ 분류</button></header>
+        ${svc.length?`<div style="padding:8px 0 4px">${svc.map(c=>
+          `<button class="prow" data-editmcat="${c.id}" style="width:100%">
+            <b><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</b>
+            <span class="bar"><i style="width:${svTot?sum(sv.filter(r=>r.catId===c.id),r=>r.amount)/svTot*100:0}%;background:${c.color}"></i></span>
+            <small style="width:80px">${shortWon(sum(sv.filter(r=>r.catId===c.id),r=>r.amount))}</small></button>`).join('')}</div>`:''}
         <div class="empty" style="padding-bottom:6px">지출 합계에서 빠지는 항목이에요.
           기록할 때 분류를 <b>저축·투자</b>로 고르면 여기에 모입니다.</div>
         ${sv.length?sv.map(txRow).join(''):''}</div>`;
@@ -2771,6 +2816,33 @@ function genCatSheet(kind,id){
       <button class="save" data-save${kind}cat="${c?c.id:''}">저장</button></div>`);
   focusIn('#f-name');
 }
+function cvSheet(id){
+  const v=id?(S.calViews||[]).find(x=>x.id===id):null;
+  sheetPick.cvCats=v?(v.cats||[]).slice():[];
+  sheetPick.cvTodo=!!(v&&v.todo);
+  sheetPick.cvMoney=!!(v&&v.money);
+  sheetPick.cvGoal=!!(v&&v.goal);
+  openSheet(`<h2>${v?'보기 묶음 수정':'보기 묶음 만들기'}</h2>
+    <p class="hint">보고 싶은 것만 골라 이름을 붙여 두면, 달력 위 버튼 하나로 전환됩니다.</p>
+    <p class="err" id="err"></p>
+    <div class="field"><label for="f-cvname">이름</label>
+      <input id="f-cvname" type="text" value="${v?esc(v.name):''}" placeholder="업무, 개인, 돈" maxlength="10"></div>
+    <div class="field"><label>넣을 일정 분류</label>
+      <div class="picks">${S.ecats.map(c=>
+        `<button type="button" data-cvcat="${c.id}" class="${sheetPick.cvCats.indexOf(c.id)>=0?'on':''}">
+          <i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')
+        ||'<span style="font-size:13px;color:var(--muted)">일정 분류가 없어요</span>'}</div></div>
+    <div class="field"><label>함께 볼 것</label>
+      <div class="picks">
+        <button type="button" data-cvopt="todo" class="${sheetPick.cvTodo?'on':''}">할 일</button>
+        <button type="button" data-cvopt="money" class="${sheetPick.cvMoney?'on':''}">가계부</button>
+        <button type="button" data-cvopt="goal" class="${sheetPick.cvGoal?'on':''}">목표</button>
+      </div></div>
+    <div class="actions">${v?`<button class="del" data-delcv="${v.id}">삭제</button>`
+      :'<button class="cancel" data-close="1">취소</button>'}
+      <button class="save" data-savecv="${v?v.id:''}">저장</button></div>`);
+  focusIn('#f-cvname');
+}
 function fixSheet(id){
   const f=id?(S.fixed||[]).find(x=>x.id===id):null;
   const kind=f?f.type:'out';
@@ -3214,7 +3286,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -3293,7 +3365,7 @@ document.addEventListener('click',ev=>{
   if(d.editcat){genCatSheet('hab',d.editcat);return}
   if(d.newecat){genCatSheet('ev',null);return}
   if(d.editecat){genCatSheet('ev',d.editecat);return}
-  if(d.newmcat){mcatSheet(null);return}
+  if(d.newmcat){ moneyType=(d.newmcat==='in'?'in':'out'); mcatSheet(null); return; }
   if(d.editmcat){mcatSheet(d.editmcat);return}
   if(d.newev){evSheet(null);return}
   if(d.ev){evSheet(d.ev);return}
@@ -3598,6 +3670,38 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.calfilter){calFilter=d.calfilter;render();return}
+  if(d.cvsheet!==undefined){cvSheet(d.cvsheet||null);return}
+  if(d.cvcat){
+    const i=sheetPick.cvCats.indexOf(d.cvcat);
+    if(i>=0) sheetPick.cvCats.splice(i,1); else sheetPick.cvCats.push(d.cvcat);
+    el.classList.toggle('on');
+    return;
+  }
+  if(d.cvopt){
+    const k=d.cvopt==='todo'?'cvTodo':d.cvopt==='money'?'cvMoney':'cvGoal';
+    sheetPick[k]=!sheetPick[k];
+    el.classList.toggle('on',sheetPick[k]);
+    return;
+  }
+  if(d.savecv!==undefined){
+    const nm=$('#f-cvname').value.trim();
+    if(!nm) return showErr('이름을 적어 주세요.');
+    if(!sheetPick.cvCats.length&&!sheetPick.cvTodo&&!sheetPick.cvMoney&&!sheetPick.cvGoal)
+      return showErr('하나 이상 골라 주세요.');
+    const o={name:nm,cats:sheetPick.cvCats.slice(),todo:sheetPick.cvTodo,
+      money:sheetPick.cvMoney,goal:sheetPick.cvGoal};
+    S.calViews||=[];
+    if(d.savecv) Object.assign(S.calViews.find(x=>x.id===d.savecv),o);
+    else { const id2=uid(); S.calViews.push({id:id2,...o}); calFilter='v:'+id2; }
+    save();closeSheet();render();toast('보기 묶음을 저장했어요');
+    return;
+  }
+  if(d.delcv){
+    S.calViews=(S.calViews||[]).filter(x=>x.id!==d.delcv);
+    if(calFilter==='v:'+d.delcv) calFilter='all';
+    save();closeSheet();render();toast('삭제했어요');
+    return;
+  }
   if(d.newfix){fixSheet(null);return}
   if(d.editfix){fixSheet(d.editfix);return}
   if(d.savefix!==undefined){
@@ -3835,9 +3939,9 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:26,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:27,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
-       fixed:S.fixed,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
+       fixed:S.fixed,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
        logs:{},seeded:false};
     save();tab='today';view=today();render();toast('처음 상태로 돌렸어요');return;
