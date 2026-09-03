@@ -548,7 +548,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v61';
+const APP_VER='v62';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2123,13 +2123,13 @@ function vMoney(){
             :'<div class="per">예산을 정하면 하루에 쓸 수 있는 금액을 알려드려요.</div>'}
           <button class="pill g" style="margin:11px 0 0" data-budget="1">예산 ${b?'수정':'설정'}</button>
         </div></div></div>
-    <div class="card"><header><h2>분류별 지출</h2>
-      <span class="count">예산은 분류를 눌러 정해요</span></header>
+    <div class="card"><header><h2>분류별 지출·예산</h2>
+      <span class="count">분류를 눌러 예산 설정</span></header>
       ${(()=>{
         const list=S.mcats.filter(c=>c.type==='out'&&!c.sv);
         const used={}; outOnly(rows).forEach(r=>{used[r.catId]=(used[r.catId]||0)+r.amount});
-        const shown=list.filter(c=>used[c.id]||c.bud);
-        if(!shown.length) return '<div class="empty">지출 기록이나 분류 예산이 없어요.</div>';
+        const shown=list;
+        if(!shown.length) return '<div class="empty">지출 분류가 없어요.</div>';
         return `<div style="padding:10px 0 14px">${shown.map(c=>{
           const v=used[c.id]||0, b=c.bud||0;
           const pct=b?Math.min(100,v/b*100):(out?v/out*100:0);
@@ -2775,6 +2775,14 @@ function mcatSheet(id){
     <div class="field"><label>종류</label><div class="picks">
       <button type="button" data-picktype="out" class="${sheetPick.mtype==='out'?'on':''}">지출</button>
       <button type="button" data-picktype="in" class="${sheetPick.mtype==='in'?'on':''}">수입</button></div></div>
+    <div class="field"><label for="f-bud">이 분류 월 예산 (0이면 없음)</label>
+      <input id="f-bud" type="number" min="0" step="10000" value="${(c&&c.bud)?c.bud:''}" placeholder="0">
+      <p class="tip">정해두면 가계부에서 쓴 금액이 예산 대비로 보이고, 넘으면 분홍색으로 표시돼요.</p></div>
+    <div class="field"><label for="f-sv">저축·투자</label>
+      <select id="f-sv">
+        <option value="0" ${(c&&c.sv)?'':'selected'}>일반 지출로 계산</option>
+        <option value="1" ${(c&&c.sv)?'selected':''}>저축·투자 (지출 합계에서 빼기)</option>
+      </select></div>
     <div class="field"><label>색</label>${swatch(sheetPick.color)}</div>
     <div class="actions">${c?`<button class="del" data-delmcat="${c.id}">삭제</button>`
       :'<button class="cancel" data-close="1">취소</button>'}
@@ -3310,7 +3318,8 @@ document.addEventListener('click',ev=>{
   if(d.savemcat!==undefined){
     const name=$('#f-name').value.trim();
     if(!name) return showErr('분류 이름을 적어 주세요.');
-    const o={name,color:sheetPick.color,type:sheetPick.mtype};
+    const o={name,color:sheetPick.color,type:sheetPick.mtype,
+      bud:Math.max(0,+$('#f-bud').value||0), sv:$('#f-sv').value==='1'};
     if(d.savemcat) Object.assign(S.mcats.find(x=>x.id===d.savemcat),o);
     else S.mcats.push({id:uid(),...o});
     save();closeSheet();render();toast('저장했어요');return;
