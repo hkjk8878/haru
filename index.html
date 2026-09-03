@@ -548,7 +548,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v62';
+const APP_VER='v64';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -673,7 +673,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:25,
+    version:26,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -704,7 +704,7 @@ function seed(){
              {id:uid(),title:'기출 5회분',due:addDays(t,30),done:false}]}],
     money:[{id:uid(),date:t,type:'out',catId:'food',amount:9500,memo:'점심'}],
     budget:1200000,
-    fixed:[{id:uid(),name:'적금',catId:'saving',amount:300000,day:25,type:'out'}],
+    fixed:[{id:uid(),name:'적금',catId:'saving',amount:300000,day:25,type:'out',time:'09:00',notify:'0'}],
     notify:{on:false,fired:{}},
     push:{url:'',id:'',on:false,at:'',err:''},
     sync:{room:'',on:false,rev:0,at:''},
@@ -747,6 +747,7 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<26){ (d.fixed||[]).forEach(f=>{f.time=f.time||'09:00'; f.notify=f.notify||''}); d.version=26; }
   if(d.version<25){ d.fixed=[]; (d.mcats||[]).forEach(c=>{c.bud=c.bud||0}); d.version=25; }
   if(d.version<24){ (d.events||[]).forEach(e=>{e.notify2=e.notify2||''}); d.version=24; }
   if(d.version<23){
@@ -942,6 +943,7 @@ const NOCAT={id:'',name:'분류 없음',color:'#8A87A0'};
 const catOf=id=>S.cats.find(c=>c.id===id)||NOCAT;
 const ecatOf=id=>S.ecats.find(c=>c.id===id)||NOCAT;
 const mcatOf=id=>S.mcats.find(c=>c.id===id)||{...NOCAT,type:'out'};
+const fixDay=(f,d)=>Math.min(f.day||1,daysIn(monthOf(d)))===+d.slice(8);
 const isSaving=m=>m.type==='out'&&!!(mcatOf(m.catId)||{}).sv;
 const outOnly=arr=>arr.filter(m=>m.type==='out'&&!isSaving(m));
 const savOnly=arr=>arr.filter(m=>isSaving(m));
@@ -1130,6 +1132,22 @@ function alarmsFor(d){
     out.push({key:'w'+e.id,at:20*60,title:'내일 '+e.title,
       body:(e.allDay?'하루 종일':e.start+' 시작')+(e.location?' · '+e.location:''),
       label:e.title+' (하루 전)',kind:'일정'});
+  });
+  (S.fixed||[]).forEach(f=>{
+    if(!f.notify) return;
+    const ft=f.time||'09:00';
+    if(+f.notify>=1440){
+      if(!fixDay(f,addDays(d,1))) return;
+      out.push({key:'f'+f.id,at:20*60,title:'내일 '+f.name+' '+won(f.amount),
+        body:(f.type==='in'?'고정 수입':'고정 지출')+' · 내일이 그날이에요',
+        label:f.name+' (하루 전)',kind:'고정'});
+      return;
+    }
+    if(!fixDay(f,d)) return;
+    out.push({key:'f'+f.id,at:toMin(ft)-+f.notify,
+      title:f.name+' '+won(f.amount),
+      body:(f.type==='in'?'고정 수입':'고정 지출')+' · 오늘이 그날이에요',
+      label:f.name,kind:'고정'});
   });
   todosOn(d).forEach(t=>{
     if(!t.time||!t.notify||t.done) return;
@@ -1421,6 +1439,21 @@ function pushSchedule(){
           title:(date===dd?'':'내일 ')+e.title,body});
       }
     });
+  });
+  (S.fixed||[]).forEach(f=>{
+    if(!f.notify) return;
+    const ft=f.time||'09:00';
+    const body=(f.type==='in'?'고정 수입':'고정 지출');
+    for(let i=0;i<120;i++){
+      const dd=addDays(t,i);
+      if(dd>limit) break;
+      if(!fixDay(f,dd)) continue;
+      let m=toMin(ft)-+f.notify, date=dd;
+      while(m<0){ m+=1440; date=addDays(date,-1); }
+      if(date<t) continue;
+      dated.push({k:'f'+f.id+'_'+dd,date,at:toTime(m),
+        title:(date===dd?'':'내일 ')+f.name+' '+won(f.amount),body});
+    }
   });
   S.todos.forEach(td=>{
     if(!td.time||!td.notify||td.done) return;
@@ -2164,7 +2197,7 @@ function vMoney(){
           return `<div class="fxrow">
             <button class="fi" data-editfix="${f.id}">
               <span class="dot" style="background:${c.color}"></span>
-              <span class="m"><b>${esc(f.name)}</b><small>매월 ${f.day||1}일 · ${esc(c.name)}</small></span>
+              <span class="m"><b>${esc(f.name)}${f.notify?' 🔔':''}</b><small>매월 ${f.day||1}일 · ${esc(c.name)}${f.notify?' · '+(f.time||'09:00'):''}</small></span>
               <span class="v">${f.type==='in'?'+':'−'}${won(f.amount)}</span></button>
             ${done?'<span class="fdone">기록됨</span>'
               :`<button class="fadd" data-addfix="${f.id}">넣기</button>`}
@@ -2757,6 +2790,10 @@ function fixSheet(id){
     <div class="field"><label for="f-fcat">분류</label>
       <select id="f-fcat">${S.mcats.map(c=>
         `<option value="${c.id}" ${f&&f.catId===c.id?'selected':''}>${esc(c.name)}${c.sv?' (저축)':''} · ${c.type==='in'?'수입':'지출'}</option>`).join('')}</select></div>
+    <div class="field"><label for="f-ftime">알림 시각</label>
+      <input id="f-ftime" type="time" value="${f?f.time||'09:00':'09:00'}"></div>
+    ${notifySelect2(f?f.notify:'','알림','f-notify')}
+    <p class="hint" style="margin:-6px 0 13px">그날이 되면 알려줍니다. 알림을 받고 가계부에 기록하면 편해요.</p>
     <div class="actions">${f?`<button class="del" data-delfix="${f.id}">삭제</button>`
       :'<button class="cancel" data-close="1">취소</button>'}
       <button class="save" data-savefix="${f?f.id:''}">저장</button></div>`);
@@ -3569,7 +3606,8 @@ document.addEventListener('click',ev=>{
     if(!nm) return showErr('이름을 적어 주세요.');
     if(!amt) return showErr('금액을 넣어 주세요.');
     const o={name:nm,amount:amt,day:Math.min(31,Math.max(1,+$('#f-fday').value||1)),
-      type:$('#f-ftype').value,catId:$('#f-fcat').value};
+      type:$('#f-ftype').value,catId:$('#f-fcat').value,
+      time:$('#f-ftime').value||'09:00',notify:$('#f-notify').value};
     S.fixed||=[];
     if(d.savefix) Object.assign(S.fixed.find(x=>x.id===d.savefix),o);
     else S.fixed.push({id:uid(),...o});
@@ -3797,7 +3835,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:25,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:26,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
