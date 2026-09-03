@@ -550,7 +550,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v66';
+const APP_VER='v67';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -675,7 +675,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:27,
+    version:28,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -706,8 +706,10 @@ function seed(){
              {id:uid(),title:'기출 5회분',due:addDays(t,30),done:false}]}],
     money:[{id:uid(),date:t,type:'out',catId:'food',amount:9500,memo:'점심'}],
     budget:1200000,
+    budgets:{[monthOf(t)]:1200000}, catBud:{},
     calViews:[],
-    fixed:[{id:uid(),name:'적금',catId:'saving',amount:300000,day:25,type:'out',time:'09:00',notify:'0'}],
+    fixed:[{id:uid(),name:'적금',catId:'saving',amount:300000,day:25,type:'out',time:'09:00',notify:'0',
+      from:monthOf(t),to:'',amt:{},skip:[]}],
     notify:{on:false,fired:{}},
     push:{url:'',id:'',on:false,at:'',err:''},
     sync:{room:'',on:false,rev:0,at:''},
@@ -750,6 +752,12 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<28){
+    d.budgets={}; d.catBud={};
+    if(d.budget) d.budgets[monthOf(today())]=d.budget;
+    (d.fixed||[]).forEach(f=>{ f.from=f.from||''; f.to=f.to||''; f.amt=f.amt||{}; f.skip=f.skip||[]; });
+    d.version=28;
+  }
   if(d.version<27){ d.calViews=[]; d.version=27; }
   if(d.version<26){ (d.fixed||[]).forEach(f=>{f.time=f.time||'09:00'; f.notify=f.notify||''}); d.version=26; }
   if(d.version<25){ d.fixed=[]; (d.mcats||[]).forEach(c=>{c.bud=c.bud||0}); d.version=25; }
@@ -801,6 +809,7 @@ function migrate(d){
   d.push||={url:'',id:'',on:false,at:'',err:''};
   d.sync||={room:'',on:false,rev:0,at:''};
   d.lines||=[]; d.lineMode||='both'; d.modes||=[]; d.calViews||=[];
+  d.budgets||={}; d.catBud||={};
   if(typeof d.activeModeId!=='string') d.activeModeId='';
   if(d.modeOverride===undefined) d.modeOverride=null; d.collapsed||={}; d.homeView||='card';
   return d;
@@ -947,6 +956,22 @@ const NOCAT={id:'',name:'분류 없음',color:'#8A87A0'};
 const catOf=id=>S.cats.find(c=>c.id===id)||NOCAT;
 const ecatOf=id=>S.ecats.find(c=>c.id===id)||NOCAT;
 const mcatOf=id=>S.mcats.find(c=>c.id===id)||{...NOCAT,type:'out'};
+const prevYM=ym=>{const[y,m]=ym.split('-').map(Number);return m===1?`${y-1}-12`:`${y}-${pad(m-1)}`};
+function carryVal(map,ym){
+  if(!map) return undefined;
+  const ks=Object.keys(map).filter(k=>k<=ym).sort();
+  return ks.length?map[ks[ks.length-1]]:undefined;
+}
+const budgetFor=ym=>{const v=carryVal(S.budgets,ym);return v===undefined?(S.budget||0):v};
+function catBudFor(ym,cid){
+  const maps=S.catBud||{};
+  const ks=Object.keys(maps).filter(k=>k<=ym).sort();
+  for(let i=ks.length-1;i>=0;i--){ const m=maps[ks[i]]; if(m&&m[cid]!==undefined) return m[cid]; }
+  return (mcatOf(cid).bud)||0;
+}
+const fixActive=(f,ym)=>(!f.from||ym>=f.from)&&(!f.to||ym<=f.to)&&(f.skip||[]).indexOf(ym)<0;
+const fixAmt=(f,ym)=>{const v=carryVal(f.amt,ym);return v===undefined?f.amount:v};
+const fixedOf=ym=>(S.fixed||[]).filter(f=>fixActive(f,ym));
 const fixDay=(f,d)=>Math.min(f.day||1,daysIn(monthOf(d)))===+d.slice(8);
 const isSaving=m=>m.type==='out'&&!!(mcatOf(m.catId)||{}).sv;
 const outOnly=arr=>arr.filter(m=>m.type==='out'&&!isSaving(m));
@@ -1141,15 +1166,16 @@ function alarmsFor(d){
     if(!f.notify) return;
     const ft=f.time||'09:00';
     if(+f.notify>=1440){
-      if(!fixDay(f,addDays(d,1))) return;
-      out.push({key:'f'+f.id,at:20*60,title:'내일 '+f.name+' '+won(f.amount),
+      const nx=addDays(d,1);
+      if(!fixDay(f,nx)||!fixActive(f,monthOf(nx))) return;
+      out.push({key:'f'+f.id,at:20*60,title:'내일 '+f.name+' '+won(fixAmt(f,monthOf(nx))),
         body:(f.type==='in'?'고정 수입':'고정 지출')+' · 내일이 그날이에요',
         label:f.name+' (하루 전)',kind:'고정'});
       return;
     }
-    if(!fixDay(f,d)) return;
+    if(!fixDay(f,d)||!fixActive(f,monthOf(d))) return;
     out.push({key:'f'+f.id,at:toMin(ft)-+f.notify,
-      title:f.name+' '+won(f.amount),
+      title:f.name+' '+won(fixAmt(f,monthOf(d))),
       body:(f.type==='in'?'고정 수입':'고정 지출')+' · 오늘이 그날이에요',
       label:f.name,kind:'고정'});
   });
@@ -1451,12 +1477,12 @@ function pushSchedule(){
     for(let i=0;i<120;i++){
       const dd=addDays(t,i);
       if(dd>limit) break;
-      if(!fixDay(f,dd)) continue;
+      if(!fixDay(f,dd)||!fixActive(f,monthOf(dd))) continue;
       let m=toMin(ft)-+f.notify, date=dd;
       while(m<0){ m+=1440; date=addDays(date,-1); }
       if(date<t) continue;
       dated.push({k:'f'+f.id+'_'+dd,date,at:toTime(m),
-        title:(date===dd?'':'내일 ')+f.name+' '+won(f.amount),body});
+        title:(date===dd?'':'내일 ')+f.name+' '+won(fixAmt(f,monthOf(dd))),body});
     }
   });
   S.todos.forEach(td=>{
@@ -1633,7 +1659,8 @@ function header(){
   const hd=hs.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
   const tdd=td.filter(x=>x.done).length;
   const spent=sum(outOnly(moneyOn(view)),m=>m.amount);
-  const daily=S.budget?Math.round(S.budget/daysIn(monthOf(view))):0;
+  const mb=budgetFor(monthOf(view));
+  const daily=mb?Math.round(mb/daysIn(monthOf(view))):0;
   return `<div class="top"><div class="datenav">
       <button class="arrow" data-nav="-1" aria-label="이전 날">‹</button>
       <div><h1>${label}</h1><p class="date">${dstr}</p>
@@ -1985,7 +2012,7 @@ const cfTodo=()=>calFilter==='all'||calFilter==='todo'||!!(curCV()&&curCV().todo
 const cfMoney=()=>calFilter==='all'||calFilter==='money'||!!(curCV()&&curCV().money);
 const cfGoal=()=>calFilter==='all'||calFilter==='goal'||!!(curCV()&&curCV().goal);
 const evShown=d=>{const cs=cfEvCats();return eventsOn(d).filter(e=>cs===null||cs.indexOf(e.catId)>=0)};
-const fixOn=d=>(S.fixed||[]).filter(f=>fixDay(f,d));
+const fixOn=d=>fixedOf(monthOf(d)).filter(f=>fixDay(f,d));
 function calFilterBar(){
   const base=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표']];
   return `<div class="catbar">
@@ -2054,7 +2081,7 @@ function vCal(){
         return `<div class="ev" style="border-left-color:var(--goal)">
           <span class="tm" style="color:var(--goal)">고정</span>
           <span class="bd"><b style="font-weight:600">${esc(f.name)}</b>
-            <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(f.amount)}${done?' · 기록됨':''}</small></span>
+            <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(fixAmt(f,monthOf(view)))}${done?' · 기록됨':''}</small></span>
           ${done?'':`<button class="fadd" data-addfix="${f.id}">넣기</button>`}</div>`;
       }).join(''):''}
       ${cfMoney()?moneyOn(view).map(mm=>{
@@ -2149,7 +2176,7 @@ function vMoney(){
   const out=sum(outOnly(rows),r=>r.amount);
   const sav=sum(savOnly(rows),r=>r.amount);
   const inc=sum(rows.filter(r=>r.type==='in'),r=>r.amount);
-  const b=S.budget||0, left=b-out;
+  const b=budgetFor(moneyMonth), left=b-out;
   const isCur=moneyMonth===monthOf(today());
   const restDays=isCur?daysIn(moneyMonth)-+today().slice(8)+1:0;
   const byCat={};
@@ -2178,7 +2205,7 @@ function vMoney(){
             <div class="per">${left>=0?`남은 예산 ${won(left)}`:`예산 초과 ${won(-left)}`}
               ${(isCur&&left>0&&restDays>0)?` · 남은 ${restDays}일 동안 하루 ${won(Math.floor(left/restDays))}`:''}</div>`
             :'<div class="per">예산을 정하면 하루에 쓸 수 있는 금액을 알려드려요.</div>'}
-          <button class="pill g" style="margin:11px 0 0" data-budget="1">예산 ${b?'수정':'설정'}</button>
+          <button class="pill g" style="margin:11px 0 0" data-budget="1">${m}월 예산 ${b?'수정':'설정'}</button>
         </div></div></div>
     <div class="card"><header><h2>분류별 지출·예산</h2>
       <span class="count">눌러서 예산 설정</span>
@@ -2189,7 +2216,7 @@ function vMoney(){
         const shown=list;
         if(!shown.length) return '<div class="empty">지출 분류가 없어요.</div>';
         return `<div style="padding:10px 0 14px">${shown.map(c=>{
-          const v=used[c.id]||0, b=c.bud||0;
+          const v=used[c.id]||0, b=catBudFor(moneyMonth,c.id);
           const pct=b?Math.min(100,v/b*100):(out?v/out*100:0);
           const over=b&&v>b;
           return `<button class="prow" data-editmcat="${c.id}" style="width:100%">
@@ -2228,14 +2255,14 @@ function vMoney(){
         ${sv.length?sv.map(txRow).join(''):''}</div>`;
     })()}
     ${(()=>{
-      const fx=S.fixed||[];
-      const tot=sum(fx.filter(f=>f.type!=='in'),f=>f.amount);
-      const inTot=sum(fx.filter(f=>f.type==='in'),f=>f.amount);
+      const fx=fixedOf(moneyMonth);
+      const tot=sum(fx.filter(f=>f.type!=='in'),f=>fixAmt(f,moneyMonth));
+      const inTot=sum(fx.filter(f=>f.type==='in'),f=>fixAmt(f,moneyMonth));
       return `<div class="card"><header><h2>고정 지출·수입</h2>
         <span class="count">월 ${shortWon(tot)}${inTot?' / 수입 '+shortWon(inTot):''}</span>
         <button class="add" style="color:var(--goal)" data-newfix="1">＋ 추가</button></header>
-        <div class="empty" style="padding-bottom:${fx.length?'4px':'16px'}">적금·월세·통신비처럼 매월 같은 금액이 나가는 것들이에요.
-          아래 버튼으로 이번 달 기록에 한 번에 넣을 수 있어요.</div>
+        <div class="empty" style="padding-bottom:${fx.length?'4px':'16px'}">${m}월 기준이에요.
+          금액이나 목록이 달마다 달라지면 그 달에서 고치면 됩니다.</div>
         ${fx.length?fx.slice().sort((a,b)=>(a.day||1)-(b.day||1)).map(f=>{
           const c=mcatOf(f.catId);
           const done=S.money.some(m=>m.fx===f.id+':'+moneyMonth);
@@ -2243,7 +2270,7 @@ function vMoney(){
             <button class="fi" data-editfix="${f.id}">
               <span class="dot" style="background:${c.color}"></span>
               <span class="m"><b>${esc(f.name)}${f.notify?' 🔔':''}</b><small>매월 ${f.day||1}일 · ${esc(c.name)}${f.notify?' · '+(f.time||'09:00'):''}</small></span>
-              <span class="v">${f.type==='in'?'+':'−'}${won(f.amount)}</span></button>
+              <span class="v">${f.type==='in'?'+':'−'}${won(fixAmt(f,moneyMonth))}</span></button>
             ${done?'<span class="fdone">기록됨</span>'
               :`<button class="fadd" data-addfix="${f.id}">넣기</button>`}
           </div>`;
@@ -2850,8 +2877,9 @@ function fixSheet(id){
     <p class="hint">매월 같은 날 같은 금액이 나가는 것들이에요.</p><p class="err" id="err"></p>
     <div class="field"><label for="f-fname">이름</label>
       <input id="f-fname" type="text" value="${f?esc(f.name):''}" placeholder="적금, 월세, 통신비" maxlength="20"></div>
-    <div class="row2"><div class="field"><label for="f-famt">금액</label>
-        <input id="f-famt" class="amt" type="number" min="0" step="1000" value="${f?f.amount:''}" placeholder="0"></div>
+    <div class="row2"><div class="field"><label for="f-famt">${+moneyMonth.slice(5)}월 금액</label>
+        <input id="f-famt" class="amt" type="number" min="0" step="1000"
+          value="${f?fixAmt(f,moneyMonth):''}" placeholder="0"></div>
       <div class="field" style="flex:0 0 96px"><label for="f-fday">매월</label>
         <input id="f-fday" type="number" min="1" max="31" value="${f?f.day||1:25}"></div></div>
     <div class="field"><label for="f-ftype">종류</label>
@@ -2866,7 +2894,13 @@ function fixSheet(id){
       <input id="f-ftime" type="time" value="${f?f.time||'09:00':'09:00'}"></div>
     ${notifySelect2(f?f.notify:'','알림','f-notify')}
     <p class="hint" style="margin:-6px 0 13px">그날이 되면 알려줍니다. 알림을 받고 가계부에 기록하면 편해요.</p>
-    <div class="actions">${f?`<button class="del" data-delfix="${f.id}">삭제</button>`
+    ${f?`<p class="hint" style="margin:0 0 8px">금액은 <b>${+moneyMonth.slice(5)}월부터</b> 적용됩니다.
+      ${f.from?`(${+f.from.slice(5)}월부터 시작)`:''}</p>
+      <div class="quick" style="margin-bottom:6px">
+        <button type="button" data-fixskip="${f.id}">이 달만 빼기</button>
+        <button type="button" data-fixend="${f.id}">이 달부터 없애기</button>
+      </div>`:''}
+    <div class="actions">${f?`<button class="del" data-delfix="${f.id}">완전 삭제</button>`
       :'<button class="cancel" data-close="1">취소</button>'}
       <button class="save" data-savefix="${f?f.id:''}">저장</button></div>`);
   focusIn('#f-fname');
@@ -2884,9 +2918,10 @@ function mcatSheet(id){
     <div class="field"><label>종류</label><div class="picks">
       <button type="button" data-picktype="out" class="${sheetPick.mtype==='out'?'on':''}">지출</button>
       <button type="button" data-picktype="in" class="${sheetPick.mtype==='in'?'on':''}">수입</button></div></div>
-    <div class="field"><label for="f-bud">이 분류 월 예산 (0이면 없음)</label>
-      <input id="f-bud" type="number" min="0" step="10000" value="${(c&&c.bud)?c.bud:''}" placeholder="0">
-      <p class="tip">정해두면 가계부에서 쓴 금액이 예산 대비로 보이고, 넘으면 분홍색으로 표시돼요.</p></div>
+    <div class="field"><label for="f-bud">${+moneyMonth.slice(5)}월 예산 (0이면 없음)</label>
+      <input id="f-bud" type="number" min="0" step="10000"
+        value="${(c&&catBudFor(moneyMonth,c.id))||''}" placeholder="0">
+      <p class="tip">이 달부터 적용돼요. 달마다 다르면 그 달에 와서 고치면 됩니다.</p></div>
     <div class="field"><label for="f-sv">저축·투자</label>
       <select id="f-sv">
         <option value="0" ${(c&&c.sv)?'':'selected'}>일반 지출로 계산</option>
@@ -3276,9 +3311,12 @@ function todoSheet(id){
   focusIn('#f-ttitle');
 }
 function budgetSheet(){
-  openSheet(`<h2>월 예산</h2><p class="hint">한 달에 쓸 금액을 정하면 하루 몫을 계산해 드려요.</p>
+  const [by,bm]=moneyMonth.split('-').map(Number);
+  openSheet(`<h2>${by}년 ${bm}월 예산</h2>
+    <p class="hint">이 달부터 적용됩니다. 다음 달에 다시 정하면 그때부터 바뀌어요.</p>
     <div class="field"><label for="f-amt">금액 (0이면 해제)</label>
-      <input class="amt" id="f-amt" type="number" inputmode="numeric" min="0" step="10000" value="${S.budget||''}" placeholder="0"></div>
+      <input class="amt" id="f-amt" type="number" inputmode="numeric" min="0" step="10000"
+        value="${budgetFor(moneyMonth)||''}" placeholder="0"></div>
     <div class="actions"><button class="cancel" data-close="1">취소</button>
       <button class="save" data-savebudget="1">저장</button></div>`);
   focusIn('#f-amt');
@@ -3286,7 +3324,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -3427,10 +3465,13 @@ document.addEventListener('click',ev=>{
   if(d.savemcat!==undefined){
     const name=$('#f-name').value.trim();
     if(!name) return showErr('분류 이름을 적어 주세요.');
-    const o={name,color:sheetPick.color,type:sheetPick.mtype,
-      bud:Math.max(0,+$('#f-bud').value||0), sv:$('#f-sv').value==='1'};
-    if(d.savemcat) Object.assign(S.mcats.find(x=>x.id===d.savemcat),o);
-    else S.mcats.push({id:uid(),...o});
+    const bv=Math.max(0,+$('#f-bud').value||0);
+    const o={name,color:sheetPick.color,type:sheetPick.mtype, sv:$('#f-sv').value==='1'};
+    let cid2=d.savemcat;
+    if(cid2) Object.assign(S.mcats.find(x=>x.id===cid2),o);
+    else { cid2=uid(); S.mcats.push({id:cid2,...o}); }
+    S.catBud||={}; S.catBud[moneyMonth]=S.catBud[moneyMonth]||{};
+    S.catBud[moneyMonth][cid2]=bv;
     save();closeSheet();render();toast('저장했어요');return;
   }
   if(d.delmcat){
@@ -3576,8 +3617,10 @@ document.addEventListener('click',ev=>{
     save();closeSheet();render();toast('기록했어요');return;
   }
   if(d.savebudget){
-    S.budget=Math.max(0,Math.round(+$('#f-amt').value||0));
-    save();closeSheet();render();toast(S.budget?'예산을 저장했어요':'예산을 해제했어요');return;
+    const v=Math.max(0,Math.round(+$('#f-amt').value||0));
+    S.budgets||={}; S.budgets[moneyMonth]=v; S.budget=v;
+    save();closeSheet();render();
+    toast(v?`${+moneyMonth.slice(5)}월 예산을 저장했어요`:'예산을 해제했어요');return;
   }
   if(d.delgrp){
     const g=grpOf(d.delgrp);
@@ -3709,13 +3752,30 @@ document.addEventListener('click',ev=>{
     const amt=Math.round(+$('#f-famt').value||0);
     if(!nm) return showErr('이름을 적어 주세요.');
     if(!amt) return showErr('금액을 넣어 주세요.');
-    const o={name:nm,amount:amt,day:Math.min(31,Math.max(1,+$('#f-fday').value||1)),
+    const o={name:nm,day:Math.min(31,Math.max(1,+$('#f-fday').value||1)),
       type:$('#f-ftype').value,catId:$('#f-fcat').value,
       time:$('#f-ftime').value||'09:00',notify:$('#f-notify').value};
     S.fixed||=[];
-    if(d.savefix) Object.assign(S.fixed.find(x=>x.id===d.savefix),o);
-    else S.fixed.push({id:uid(),...o});
+    if(d.savefix){
+      const f2=S.fixed.find(x=>x.id===d.savefix);
+      Object.assign(f2,o);
+      f2.amt=f2.amt||{}; f2.amt[moneyMonth]=amt;
+    } else {
+      S.fixed.push({id:uid(),...o,amount:amt,from:moneyMonth,to:'',amt:{[moneyMonth]:amt},skip:[]});
+    }
     save();closeSheet();render();toast('저장했어요');
+    return;
+  }
+  if(d.fixskip){
+    const f=(S.fixed||[]).find(x=>x.id===d.fixskip);
+    if(f){ f.skip=(f.skip||[]).concat([moneyMonth]); save(); }
+    closeSheet();render();toast(`${+moneyMonth.slice(5)}월에는 빠집니다`);
+    return;
+  }
+  if(d.fixend){
+    const f=(S.fixed||[]).find(x=>x.id===d.fixend);
+    if(f){ f.to=prevYM(moneyMonth); save(); }
+    closeSheet();render();toast(`${+moneyMonth.slice(5)}월부터 없애요`);
     return;
   }
   if(d.delfix){
@@ -3730,9 +3790,10 @@ document.addEventListener('click',ev=>{
     list.forEach(f=>{
       const key=f.id+':'+ym;
       if(S.money.some(m=>m.fx===key)) return;
+      if(!fixActive(f,ym)) return;
       const dd=Math.min(f.day||1,daysIn(ym));
       S.money.push({id:uid(),date:`${ym}-${pad(dd)}`,type:f.type||'out',catId:f.catId,
-        amount:f.amount,memo:f.name,fx:key});
+        amount:fixAmt(f,ym),memo:f.name,fx:key});
       n++;
     });
     save();render();
@@ -3939,9 +4000,9 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:27,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:28,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
-       fixed:S.fixed,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
+       fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
        logs:{},seeded:false};
     save();tab='today';view=today();render();toast('처음 상태로 돌렸어요');return;
