@@ -393,7 +393,23 @@ input,select,textarea{font:inherit;color:inherit}
 .tx .m b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tx .m small{font-size:11.5px;color:var(--muted)}
 .tx .v{font-size:14.5px;font-weight:700;flex:none}
-.tx .v.in{color:var(--habit)}
+.tx .v.in{color:#34D399}
+.tx .v.sav{color:var(--plan)}
+.tx .v.out{color:var(--task)}
+b.in,small.in{color:#34D399}
+b.sav,small.sav{color:var(--plan)}
+b.out,small.out{color:var(--task)}
+.cdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.sec2{padding:0;overflow:hidden}
+.sec2>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:15px 16px;cursor:pointer}
+.sec2>summary::-webkit-details-marker{display:none}
+.sec2>summary h2{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.sec2>summary .count{margin-left:auto;font-size:12px;color:var(--muted)}
+.sec2>summary::after{content:'▾';font-size:11px;color:var(--muted);margin-left:2px}
+.sec2[open]>summary::after{content:'▴'}
+.sec2 .secb{padding-bottom:6px}
+.subh{padding:10px 16px 2px;font-size:12px;font-weight:700;color:var(--muted);display:flex;gap:7px}
+.subh b{font-weight:750}
 .fxrow{display:flex;align-items:center;gap:8px;padding:4px 16px 4px 16px}
 .fxrow .fi{flex:1;display:flex;align-items:center;gap:11px;min-width:0;padding:7px 0}
 .fxrow .fi .dot{width:9px;height:9px;border-radius:50%;flex:none}
@@ -550,7 +566,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v67';
+const APP_VER='v68';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -561,6 +577,7 @@ const OFFS=[['','알림 없음'],['0','정시에'],['5','5분 전'],['10','10분
 const offLabel=v=>(OFFS.find(o=>o[0]===String(v))||['',''])[1];
 
 let installEvt=null, homeTab='routine', alarmOpen=false, pastOpen=false;
+let mOpen={fix:true,inc:false,sav:false,out:true,rec:true};
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
     calFilter='all', statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
     sheetDays=[], sheetPick={}, moneyType='out';
@@ -2078,8 +2095,9 @@ function vCal(){
       ${cfMoney()?fixOn(view).map(f=>{
         const c=mcatOf(f.catId);
         const done=S.money.some(m=>m.fx===f.id+':'+monthOf(view));
-        return `<div class="ev" style="border-left-color:var(--goal)">
-          <span class="tm" style="color:var(--goal)">고정</span>
+        const fcl=f.type==='in'?'#34D399':(c.sv?'var(--plan)':'var(--task)');
+        return `<div class="ev" style="border-left-color:${fcl}">
+          <span class="tm" style="color:${fcl}">고정 ${f.type==='in'?'수입':'지출'}</span>
           <span class="bd"><b style="font-weight:600">${esc(f.name)}</b>
             <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(fixAmt(f,monthOf(view)))}${done?' · 기록됨':''}</small></span>
           ${done?'':`<button class="fadd" data-addfix="${f.id}">넣기</button>`}</div>`;
@@ -2087,10 +2105,10 @@ function vCal(){
       ${cfMoney()?moneyOn(view).map(mm=>{
         const c=mcatOf(mm.catId);
         return `<button class="ev" data-tx="${mm.id}" style="border-left-color:${c.color}">
-          <span class="tm" style="color:${c.color}">${mm.type==='in'?'수입':c.sv?'저축':'지출'}</span>
+          <span class="tm" style="color:${mm.type==='in'?'#34D399':c.sv?'var(--plan)':'var(--task)'}">${mm.type==='in'?'수입':c.sv?'저축':'지출'}</span>
           <span class="bd"><b style="font-weight:600">${esc(mm.memo||c.name)}</b>
             <small>${esc(c.name)}</small></span>
-          <span class="bell">${mm.type==='in'?'+':'−'}${shortWon(mm.amount)}</span></button>`;
+          <span class="bell ${mm.type==='in'?'in':c.sv?'sav':'out'}" style="font-weight:700">${mm.type==='in'?'+':'−'}${shortWon(mm.amount)}</span></button>`;
       }).join(''):''}
       ${(cfTodo()?todosOn(view):[]).map(t=>`<div class="ev" style="border-left-color:var(--task)">
         <span class="tm" style="color:var(--task)">할 일</span>
@@ -2168,22 +2186,92 @@ function txRow(m){
   const c=mcatOf(m.catId);
   return `<button class="tx" data-tx="${m.id}"><span class="dot" style="background:${c.color}"></span>
     <span class="m"><b>${esc(m.memo||c.name)}</b><small>${esc(c.name)}${c.sv?' · 저축':''}</small></span>
-    <span class="v ${m.type}">${m.type==='in'?'+':isSaving(m)?'↓':'−'}${won(m.amount)}</span></button>`;
+    <span class="v ${m.type==='in'?'in':isSaving(m)?'sav':'out'}">${m.type==='in'?'+':isSaving(m)?'↓':'−'}${won(m.amount)}</span></button>`;
 }
 function vMoney(){
   const [y,m]=moneyMonth.split('-').map(Number);
-  const rows=moneyIn(moneyMonth);
+  const ym=moneyMonth;
+  const rows=moneyIn(ym);
   const out=sum(outOnly(rows),r=>r.amount);
   const sav=sum(savOnly(rows),r=>r.amount);
   const inc=sum(rows.filter(r=>r.type==='in'),r=>r.amount);
-  const b=budgetFor(moneyMonth), left=b-out;
-  const isCur=moneyMonth===monthOf(today());
-  const restDays=isCur?daysIn(moneyMonth)-+today().slice(8)+1:0;
-  const byCat={};
-  outOnly(rows).forEach(r=>{byCat[r.catId]=(byCat[r.catId]||0)+r.amount});
-  const cats=Object.entries(byCat).sort((a,b2)=>b2[1]-a[1]);
+  const b=budgetFor(ym), left=b-out;
+  const isCur=ym===monthOf(today());
+  const restDays=isCur?daysIn(ym)-+today().slice(8)+1:0;
   const dates=[...new Set(rows.map(r=>r.date))].sort().reverse();
   const prevM=m===1?`${y-1}-12`:`${y}-${pad(m-1)}`, nextM=m===12?`${y+1}-01`:`${y}-${pad(m+1)}`;
+  const sec=(k,title,count,body,btn)=>`<details class="card sec2" id="mc-${k}" ${mOpen[k]?'open':''}>
+    <summary><h2>${title}</h2><span class="count">${count}</span>${btn||''}</summary>
+    <div class="secb">${body}</div></details>`;
+
+  /* 고정 지출·수입 */
+  const fx=fixedOf(ym);
+  const fxOut=fx.filter(f=>f.type!=='in'), fxIn=fx.filter(f=>f.type==='in');
+  const fxTot=sum(fxOut,f=>fixAmt(f,ym)), fxInTot=sum(fxIn,f=>fixAmt(f,ym));
+  const fxRow=f=>{
+    const c=mcatOf(f.catId);
+    const done=S.money.some(x=>x.fx===f.id+':'+ym);
+    const cls=f.type==='in'?'in':(c.sv?'sav':'out');
+    return `<div class="fxrow">
+      <button class="fi" data-editfix="${f.id}">
+        <span class="dot" style="background:${c.color}"></span>
+        <span class="m"><b>${esc(f.name)}${f.notify?' 🔔':''}</b>
+          <small>매월 ${f.day||1}일 · ${esc(c.name)}${f.notify?' · '+(f.time||'09:00'):''}</small></span>
+        <span class="v ${cls}">${f.type==='in'?'+':'−'}${won(fixAmt(f,ym))}</span></button>
+      ${done?'<span class="fdone">기록됨</span>'
+        :`<button class="fadd" data-addfix="${f.id}">넣기</button>`}
+    </div>`;
+  };
+  const fixBody=`<div class="empty" style="padding:2px 16px 10px">${m}월 기준이에요. 금액이나 목록이 달마다 다르면 그 달에서 고치면 됩니다.</div>
+    ${fxIn.length?`<div class="subh">고정 수입 <b class="in">+${shortWon(fxInTot)}</b></div>`+fxIn.map(fxRow).join(''):''}
+    ${fxOut.length?`<div class="subh">고정 지출 <b class="out">−${shortWon(fxTot)}</b></div>`+fxOut.map(fxRow).join(''):''}
+    ${fx.length?'<button class="addbtn" style="color:var(--goal)" data-addallfix="1">이번 달 전부 넣기</button>'
+      :'<div class="empty">적금·월세·월급처럼 매월 반복되는 것을 등록해 두세요.</div>'}`;
+
+  /* 수입 */
+  const ins=S.mcats.filter(c=>c.type==='in');
+  const got={}; rows.filter(r=>r.type==='in').forEach(r=>{got[r.catId]=(got[r.catId]||0)+r.amount});
+  const incBody=ins.length?`<div style="padding:8px 0 6px">${ins.map(c=>
+    `<button class="prow" data-editmcat="${c.id}" style="width:100%">
+      <b><span class="cdot" style="background:${c.color}"></span>${esc(c.name)}</b>
+      <span class="bar"><i style="width:${inc?(got[c.id]||0)/inc*100:0}%;background:${c.color}"></i></span>
+      <small class="in" style="width:82px">${shortWon(got[c.id]||0)}</small></button>`).join('')}</div>`
+    :'<div class="empty">수입 분류가 없어요.</div>';
+
+  /* 저축 */
+  const sv=savOnly(rows);
+  const svc=S.mcats.filter(c=>c.type==='out'&&c.sv);
+  const savBody=`<div class="empty" style="padding:2px 16px 8px">지출 합계에서 빠지는 항목이에요.
+      기록할 때 분류를 저축으로 고르면 여기에 모입니다.</div>
+    ${svc.length?`<div style="padding:2px 0 6px">${svc.map(c=>{
+      const v=sum(sv.filter(r=>r.catId===c.id),r=>r.amount);
+      return `<button class="prow" data-editmcat="${c.id}" style="width:100%">
+        <b><span class="cdot" style="background:${c.color}"></span>${esc(c.name)}</b>
+        <span class="bar"><i style="width:${sav?v/sav*100:0}%;background:${c.color}"></i></span>
+        <small class="sav" style="width:82px">${shortWon(v)}</small></button>`;
+    }).join('')}</div>`:''}
+    ${sv.length?sv.map(txRow).join(''):''}`;
+
+  /* 지출 */
+  const used={}; outOnly(rows).forEach(r=>{used[r.catId]=(used[r.catId]||0)+r.amount});
+  const outCats=S.mcats.filter(c=>c.type==='out'&&!c.sv);
+  const outBody=outCats.length?`<div style="padding:8px 0 6px">${outCats.map(c=>{
+      const v=used[c.id]||0, bud=catBudFor(ym,c.id);
+      const pct=bud?Math.min(100,v/bud*100):(out?v/out*100:0);
+      const over=bud&&v>bud;
+      return `<button class="prow" data-editmcat="${c.id}" style="width:100%">
+        <b><span class="cdot" style="background:${c.color}"></span>${esc(c.name)}</b>
+        <span class="bar"><i style="width:${pct}%;background:${over?'var(--task)':c.color}"></i></span>
+        <small style="width:112px;${over?'color:var(--task)':'color:var(--muted)'}">${shortWon(v)}${bud?' / '+shortWon(bud):''}</small></button>`;
+    }).join('')}</div>`
+    :'<div class="empty">지출 분류가 없어요.</div>';
+
+  /* 기록 */
+  const recBody=dates.length?dates.map(d=>{
+      const rs=rows.filter(r=>r.date===d);
+      return `<div class="daygrp"><span>${md(d)} ${DAYS[dow(d)]}</span>
+        <span>${won(sum(outOnly(rs),r=>r.amount))}</span></div>`+rs.map(txRow).join('');
+    }).join(''):'<div class="empty">＋ 기록으로 첫 지출을 남겨 보세요.</div>';
 
   return `<div class="top"><div class="datenav"><div><h1>가계부</h1>
       <p class="sub">쓴 돈과 남은 예산을 하루 단위로 봅니다.</p></div>
@@ -2193,100 +2281,32 @@ function vMoney(){
         <button class="r" data-mmonth="${nextM}">›</button></div>
       <div style="padding:4px 16px 18px">
         <div style="color:var(--muted);font-size:12.5px">이번 달 지출</div>
-        <div style="font-size:30px;font-weight:780;letter-spacing:-.03em">${won(out)}</div>
+        <div style="font-size:30px;font-weight:780;letter-spacing:-.03em;color:var(--task)">${won(out)}</div>
         <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">
-          <div style="font-size:12.5px;color:var(--muted)">수입<b style="display:block;font-size:15px;color:var(--habit)">${won(inc)}</b></div>
-          <div style="font-size:12.5px;color:var(--muted)">저축<b style="display:block;font-size:15px;color:var(--plan)">${won(sav)}</b></div>
-          <div style="font-size:12.5px;color:var(--muted)">남은 돈<b style="display:block;font-size:15px;color:${inc-out-sav>=0?'var(--habit)':'var(--task)'}">${won(inc-out-sav)}</b></div>
+          <div style="font-size:12.5px;color:var(--muted)">수입<b class="in" style="display:block;font-size:15px">${won(inc)}</b></div>
+          <div style="font-size:12.5px;color:var(--muted)">저축<b class="sav" style="display:block;font-size:15px">${won(sav)}</b></div>
+          <div style="font-size:12.5px;color:var(--muted)">남은 돈<b style="display:block;font-size:15px;color:${inc-out-sav>=0?'#34D399':'var(--task)'}">${won(inc-out-sav)}</b></div>
         </div>
-        <div class="budget">
-          <div class="l"><span>월 예산</span><b>${b?won(b):'미설정'}</b></div>
-          ${b?`<div class="bar"><i class="${out>b?'over':''}" style="width:${Math.min(100,out/b*100)}%"></i></div>
-            <div class="per">${left>=0?`남은 예산 ${won(left)}`:`예산 초과 ${won(-left)}`}
-              ${(isCur&&left>0&&restDays>0)?` · 남은 ${restDays}일 동안 하루 ${won(Math.floor(left/restDays))}`:''}</div>`
-            :'<div class="per">예산을 정하면 하루에 쓸 수 있는 금액을 알려드려요.</div>'}
-          <button class="pill g" style="margin:11px 0 0" data-budget="1">${m}월 예산 ${b?'수정':'설정'}</button>
-        </div></div></div>
-    <div class="card"><header><h2>분류별 지출·예산</h2>
-      <span class="count">눌러서 예산 설정</span>
-      <button class="add" style="color:var(--goal)" data-newmcat="out">＋ 분류</button></header>
-      ${(()=>{
-        const list=S.mcats.filter(c=>c.type==='out'&&!c.sv);
-        const used={}; outOnly(rows).forEach(r=>{used[r.catId]=(used[r.catId]||0)+r.amount});
-        const shown=list;
-        if(!shown.length) return '<div class="empty">지출 분류가 없어요.</div>';
-        return `<div style="padding:10px 0 14px">${shown.map(c=>{
-          const v=used[c.id]||0, b=catBudFor(moneyMonth,c.id);
-          const pct=b?Math.min(100,v/b*100):(out?v/out*100:0);
-          const over=b&&v>b;
-          return `<button class="prow" data-editmcat="${c.id}" style="width:100%">
-            <b><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</b>
-            <span class="bar"><i style="width:${pct}%;background:${over?'var(--task)':c.color}"></i></span>
-            <small style="width:110px;${over?'color:var(--task)':''}">${shortWon(v)}${b?' / '+shortWon(b):''}</small></button>`;
-        }).join('')}</div>`;
-      })()}</div>
-    ${(()=>{
-      const ins=S.mcats.filter(c=>c.type==='in');
-      const got={}; rows.filter(r=>r.type==='in').forEach(r=>{got[r.catId]=(got[r.catId]||0)+r.amount});
-      return `<div class="card"><header><h2>수입 분류</h2>
-        <span class="count">${won(inc)}</span>
-        <button class="add" style="color:var(--habit)" data-newmcat="in">＋ 분류</button></header>
-        ${ins.length?`<div style="padding:10px 0 14px">${ins.map(c=>
-          `<button class="prow" data-editmcat="${c.id}" style="width:100%">
-            <b><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</b>
-            <span class="bar"><i style="width:${inc?(got[c.id]||0)/inc*100:0}%;background:${c.color}"></i></span>
-            <small style="width:80px">${shortWon(got[c.id]||0)}</small></button>`).join('')}</div>`
-          :'<div class="empty">수입 분류가 없어요.</div>'}</div>`;
-    })()}
-    ${(()=>{
-      const sv=savOnly(rows);
-      const svTot=sum(sv,r=>r.amount);
-      const svc=S.mcats.filter(c=>c.type==='out'&&c.sv);
-      return `<div class="card"><header><h2>저축·투자</h2>
-        <span class="count">${won(svTot)}</span>
-        <button class="add" style="color:var(--plan)" data-newmcat="out">＋ 분류</button></header>
-        ${svc.length?`<div style="padding:8px 0 4px">${svc.map(c=>
-          `<button class="prow" data-editmcat="${c.id}" style="width:100%">
-            <b><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</b>
-            <span class="bar"><i style="width:${svTot?sum(sv.filter(r=>r.catId===c.id),r=>r.amount)/svTot*100:0}%;background:${c.color}"></i></span>
-            <small style="width:80px">${shortWon(sum(sv.filter(r=>r.catId===c.id),r=>r.amount))}</small></button>`).join('')}</div>`:''}
-        <div class="empty" style="padding-bottom:6px">지출 합계에서 빠지는 항목이에요.
-          기록할 때 분류를 <b>저축·투자</b>로 고르면 여기에 모입니다.</div>
-        ${sv.length?sv.map(txRow).join(''):''}</div>`;
-    })()}
-    ${(()=>{
-      const fx=fixedOf(moneyMonth);
-      const tot=sum(fx.filter(f=>f.type!=='in'),f=>fixAmt(f,moneyMonth));
-      const inTot=sum(fx.filter(f=>f.type==='in'),f=>fixAmt(f,moneyMonth));
-      return `<div class="card"><header><h2>고정 지출·수입</h2>
-        <span class="count">월 ${shortWon(tot)}${inTot?' / 수입 '+shortWon(inTot):''}</span>
-        <button class="add" style="color:var(--goal)" data-newfix="1">＋ 추가</button></header>
-        <div class="empty" style="padding-bottom:${fx.length?'4px':'16px'}">${m}월 기준이에요.
-          금액이나 목록이 달마다 달라지면 그 달에서 고치면 됩니다.</div>
-        ${fx.length?fx.slice().sort((a,b)=>(a.day||1)-(b.day||1)).map(f=>{
-          const c=mcatOf(f.catId);
-          const done=S.money.some(m=>m.fx===f.id+':'+moneyMonth);
-          return `<div class="fxrow">
-            <button class="fi" data-editfix="${f.id}">
-              <span class="dot" style="background:${c.color}"></span>
-              <span class="m"><b>${esc(f.name)}${f.notify?' 🔔':''}</b><small>매월 ${f.day||1}일 · ${esc(c.name)}${f.notify?' · '+(f.time||'09:00'):''}</small></span>
-              <span class="v">${f.type==='in'?'+':'−'}${won(fixAmt(f,moneyMonth))}</span></button>
-            ${done?'<span class="fdone">기록됨</span>'
-              :`<button class="fadd" data-addfix="${f.id}">넣기</button>`}
-          </div>`;
-        }).join('')+`<button class="addbtn" style="color:var(--goal)" data-addallfix="1">이번 달 전부 넣기</button>`
-        :''}</div>`;
-    })()}
-    <div class="card"><header><h2>기록</h2><span class="count">${rows.length}건</span>
-      <button class="add" style="color:var(--goal)" data-newtx="1">＋ 추가</button></header>
-      <div style="margin-top:10px">
-      ${dates.length?dates.map(d=>{
-        const rs=rows.filter(r=>r.date===d);
-        return `<div class="daygrp"><span>${md(d)} ${DAYS[dow(d)]}</span>
-          <span>${won(sum(outOnly(rs),r=>r.amount))}</span></div>`+rs.map(txRow).join('');
-      }).join(''):'<div class="empty">＋ 기록으로 첫 지출을 남겨 보세요.</div>'}</div></div>
-`;
+        ${b?`<div class="bar" style="height:7px;margin-top:14px"><i style="width:${Math.min(100,out/b*100)}%;
+            background:${out>b?'var(--task)':'linear-gradient(90deg,var(--goal),var(--task))'}"></i></div>
+          <div style="margin-top:8px;font-size:12px;color:var(--muted)">예산 ${won(b)} · ${left>=0?`${won(left)} 남음`:`${won(-left)} 넘음`}
+            ${restDays&&left>0?` · 하루 ${won(Math.round(left/restDays))}`:''}</div>`:''}
+        <button class="pill g" style="margin:11px 0 0" data-budget="1">${m}월 예산 ${b?'수정':'설정'}</button>
+      </div>
+    </div>
+    ${sec('fix','고정 지출·수입',`${fxInTot?'+'+shortWon(fxInTot)+' / ':''}−${shortWon(fxTot)}`,fixBody,
+      '<button class="add" style="color:var(--goal)" data-newfix="1">＋ 추가</button>')}
+    ${sec('inc','수입',won(inc),incBody,
+      '<button class="add" style="color:#34D399" data-newmcat="in">＋ 분류</button>')}
+    ${sec('sav','저축·투자',won(sav),savBody,
+      '<button class="add" style="color:var(--plan)" data-newmcat="out">＋ 분류</button>')}
+    ${sec('out','지출·예산',won(out),outBody,
+      '<button class="add" style="color:var(--task)" data-newmcat="out">＋ 분류</button>')}
+    ${sec('rec','기록',rows.length+'건',recBody,
+      '<button class="add" style="color:var(--goal)" data-newtx="1">＋ 추가</button>')}
+  `;
 }
+
 
 function yearCard(){
   return `${(()=>{const y=yearLeft();
@@ -2894,9 +2914,12 @@ function fixSheet(id){
       <input id="f-ftime" type="time" value="${f?f.time||'09:00':'09:00'}"></div>
     ${notifySelect2(f?f.notify:'','알림','f-notify')}
     <p class="hint" style="margin:-6px 0 13px">그날이 되면 알려줍니다. 알림을 받고 가계부에 기록하면 편해요.</p>
+    <div class="field"><label for="f-ffrom">시작하는 달 (비우면 모든 달)</label>
+      <input id="f-ffrom" type="month" value="${f?f.from||'':moneyMonth}"></div>
     ${f?`<p class="hint" style="margin:0 0 8px">금액은 <b>${+moneyMonth.slice(5)}월부터</b> 적용됩니다.
-      ${f.from?`(${+f.from.slice(5)}월부터 시작)`:''}</p>
+      ${f.from?`시작 ${f.from.replace('-','년 ')}월`:'모든 달에 적용 중'}${f.to?` · ${f.to.replace('-','년 ')}월까지`:''}</p>
       <div class="quick" style="margin-bottom:6px">
+        <button type="button" data-fixall="${f.id}">모든 달에 적용</button>
         <button type="button" data-fixskip="${f.id}">이 달만 빼기</button>
         <button type="button" data-fixend="${f.id}">이 달부터 없애기</button>
       </div>`:''}
@@ -3324,7 +3347,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -3754,16 +3777,24 @@ document.addEventListener('click',ev=>{
     if(!amt) return showErr('금액을 넣어 주세요.');
     const o={name:nm,day:Math.min(31,Math.max(1,+$('#f-fday').value||1)),
       type:$('#f-ftype').value,catId:$('#f-fcat').value,
-      time:$('#f-ftime').value||'09:00',notify:$('#f-notify').value};
+      time:$('#f-ftime').value||'09:00',notify:$('#f-notify').value,
+      from:$('#f-ffrom').value||''};
     S.fixed||=[];
     if(d.savefix){
       const f2=S.fixed.find(x=>x.id===d.savefix);
       Object.assign(f2,o);
       f2.amt=f2.amt||{}; f2.amt[moneyMonth]=amt;
     } else {
-      S.fixed.push({id:uid(),...o,amount:amt,from:moneyMonth,to:'',amt:{[moneyMonth]:amt},skip:[]});
+      S.fixed.push({id:uid(),...o,amount:amt,to:'',
+        amt:o.from?{[o.from]:amt}:{},skip:[]});
     }
     save();closeSheet();render();toast('저장했어요');
+    return;
+  }
+  if(d.fixall){
+    const f=(S.fixed||[]).find(x=>x.id===d.fixall);
+    if(f){ f.from=''; f.to=''; f.skip=[]; save(); }
+    closeSheet();render();toast('모든 달에 적용해요');
     return;
   }
   if(d.fixskip){
@@ -4011,6 +4042,7 @@ document.addEventListener('click',ev=>{
 
 document.addEventListener('toggle',e=>{
   if(e.target&&e.target.id==='pastTodos') pastOpen=e.target.open;
+  if(e.target&&(e.target.id||'').slice(0,3)==='mc-') mOpen[e.target.id.slice(3)]=e.target.open;
 },true);
 document.addEventListener('change',e=>{
   if(e.target.id==='f-own'){$('#ownDays').style.display=e.target.value==='1'?'block':'none'}
