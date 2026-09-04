@@ -87,6 +87,9 @@ input,select,textarea{font:inherit;color:inherit}
 .card > header .count{font-size:12.5px;color:var(--muted)}
 .card > header .add{margin-left:auto;font-size:13px;font-weight:650;color:var(--plan);flex:none}
 .empty{padding:14px 16px 16px;font-size:13.5px;color:var(--muted);line-height:1.6}
+.offday{padding:15px 16px 6px;background:var(--goal-soft)}
+.offday b{display:block;font-size:15px;font-weight:750;color:var(--goal)}
+.offday p{margin:6px 0 0;font-size:12.5px;color:var(--goal);opacity:.85;line-height:1.5}
 .sechead{display:flex;align-items:center;gap:8px;margin:22px 2px 0}
 .sechead h2{margin:0;font-size:14px;font-weight:700}
 .sechead span{font-size:12.5px;color:var(--muted)}
@@ -569,7 +572,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v70';
+const APP_VER='v71';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -973,7 +976,8 @@ const habById=id=>S.habits.find(x=>x.id===id);
 const habTimes=id=>{const h=habById(id);return (h&&h.times>1)?h.times:1};
 const doneN=(d,id)=>{const r=rec(d,id);return r?(r.n||1):0};
 const skipsOf=d=>{const l=log(d); if(!l.skips) l.skips={}; return l.skips};
-const isSkip=(d,id)=>!!skipsOf(d)[id];
+const dayOff=d=>!!log(d).off;
+const isSkip=(d,id)=>dayOff(d)||!!skipsOf(d)[id];
 const isDone=(d,id)=>doneN(d,id)>=habTimes(id);
 const doneAt=(d,id)=>{const r=rec(d,id);return r&&r.at?r.at:''};
 const doneVal=(d,id)=>{const r=rec(d,id);return r&&r.v?r.v:''};
@@ -1125,6 +1129,7 @@ const moneyOn=d=>S.money.filter(m=>m.date===d);
 const moneyIn=ym=>S.money.filter(m=>monthOf(m.date)===ym);
 const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
 function rateList(d,hs){
+  if(dayOff(d)) return null;
   let tot=0,dn=0;
   hs.filter(h=>!isSkip(d,h.id)).forEach(h=>{
     const t=habTimes(h.id); tot+=t; dn+=Math.min(doneN(d,h.id),t);
@@ -1729,7 +1734,7 @@ function header(){
         <span class="bar"><i style="width:${Math.min(100,y.pct*100)}%"></i></span>
         <span class="ys">${Math.round(y.pct*100)}% 지남</span></button>`;})()}
     <div class="gauges">
-      <div class="gauge g-habit"><div class="lab">습관 <b>${hd}<s>/${hTot}</s></b></div>
+      <div class="gauge g-habit"><div class="lab">습관 <b>${dayOff(view)?'쉼':hd}<s>${dayOff(view)?'':'/'+hTot}</s></b></div>
         <div class="bar"><i style="width:${hTot?hd/hTot*100:0}%"></i></div></div>
       <div class="gauge g-task"><div class="lab">할 일 <b>${tdd}<s>/${td.length}</s></b></div>
         <div class="bar"><i style="width:${td.length?tdd/td.length*100:0}%"></i></div></div>
@@ -1785,11 +1790,17 @@ function vToday(){
 function tabRoutine(){
   const gs=groupsOn(view), so=soloOn(view);
   const listMode=(S.homeView||'card')==='list';
+  const off=dayOff(view);
   const head=`<div class="sechead"><h2>${md(view)}의 루틴</h2>
-    <button data-homeview="${listMode?'card':'list'}" style="color:var(--muted)">${listMode?'카드로':'목록으로'}</button>
-    <button data-addsheet="1" style="margin-left:12px">＋ 추가</button></div>`;
+    <button data-dayoff="1" style="color:${off?'var(--goal)':'var(--muted)'}">${off?'쉼 해제':'쉬는 날'}</button>
+    <button data-homeview="${listMode?'card':'list'}" style="color:var(--muted);margin-left:10px">${listMode?'카드로':'목록으로'}</button>
+    <button data-addsheet="1" style="margin-left:10px">＋ 추가</button></div>`;
+  const offCard=off?`<div class="card offday">
+    <b>쉬는 날이에요</b>
+    <p>루틴을 세지 않고, 연속 기록도 끊기지 않아요. 하고 싶은 건 그냥 체크해도 됩니다.</p>
+    <button class="addbtn" style="color:var(--goal)" data-dayoff="1">쉼 해제하기</button></div>`:'';
   if(!gs.length&&!so.length)
-    return head+`<div class="card"><div class="empty">이 요일에 할 게 없어요.
+    return head+offCard+`<div class="card"><div class="empty">이 요일에 할 게 없어요.
       <b>＋ 추가</b>로 습관이나 루틴을 만들어 보세요.</div></div>`;
 
   if(listMode){
@@ -1806,7 +1817,7 @@ function tabRoutine(){
       buckets.push({name:'따로 하는 습관',time:rs[0]?rs[0].time:'',rows:rs});
     }
     buckets.sort(byT);
-    return head+`<div class="card"><div class="lst">${buckets.map(bk=>
+    return head+offCard+`<div class="card"><div class="lst">${buckets.map(bk=>
       `<div class="lband">${esc(bk.name)}${bk.time?`<u>${bk.time}</u>`:''}</div>`+
       bk.rows.map(({h,i:ri,time})=>{
         const tms=habTimes(h.id);
@@ -1833,7 +1844,7 @@ function tabRoutine(){
     ).join('')}</div></div>`;
   }
 
-  return head+gs.map(g=>{
+  return head+offCard+gs.map(g=>{
     const occ=occOfGroup(g.id,view);
     const act=occ.filter(o=>!isSkip(view,o.h.id));
     const done=act.filter(o=>occDone(view,o)).length, full=act.length>0&&done===act.length;
@@ -2096,6 +2107,7 @@ function vCal(){
     const mSav=mo.some(x=>x.type==='out'&&(mcatOf(x.catId)||{}).sv)||fxd.some(f=>f.type!=='in'&&mcatOf(f.catId).sv);
     const mIn=mo.some(x=>x.type==='in')||fxd.some(f=>f.type==='in');
     const hasNote=calFilter==='all'&&!!((S.logs[d]||{}).note||'').trim();
+    const isOff=!!(S.logs[d]||{}).off;
     cells.push(`<button class="dc ${d===view?'sel':''} ${d===today()?'tod':''}" data-selday="${d}">
       ${i}<span class="dots">
         ${colors.map(c=>`<i style="background:${c}"></i>`).join('')}
@@ -2105,7 +2117,8 @@ function vCal(){
         ${mIn?'<i style="background:#34D399"></i>':''}
         ${mSav?'<i style="background:var(--plan)"></i>':''}
         ${hasNote?'<i style="background:var(--muted)"></i>':''}</span>
-      <span class="rt" style="${r?`background:linear-gradient(90deg,var(--habit) ${r*100}%,var(--h0) ${r*100}%)`:''}"></span></button>`);
+      <span class="rt" style="${isOff?'background:var(--goal);opacity:.4'
+        :(r?`background:linear-gradient(90deg,var(--habit) ${r*100}%,var(--h0) ${r*100}%)`:'')}"></span></button>`);
   }
   const prevM=m===1?`${y-1}-12`:`${y}-${pad(m-1)}`, nextM=m===12?`${y+1}-01`:`${y}-${pad(m+1)}`;
   const evs=evShown(view), dueG=cfGoal()?S.goals.filter(g=>g.due===view):[];
@@ -3440,7 +3453,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -3943,6 +3956,13 @@ document.addEventListener('click',ev=>{
       t.time=$('#f-ttime').value||''; t.notify=$('#f-notify').value;
     }
     save();closeSheet();render();toast('저장했어요');
+    return;
+  }
+  if(d.dayoff){
+    const l=log(view);
+    if(l.off) delete l.off; else l.off=true;
+    save();render();
+    toast(log(view).off?'쉬는 날로 두었어요':'쉼을 풀었어요');
     return;
   }
   if(d.newplan){ sheetPick.plan=true; txSheet(null); return; }
