@@ -58,14 +58,23 @@ if (!data || data.error) {
   num(top, "할 일", `${td.done}/${td.total}`, PINK);
   if (!small) {
     top.addSpacer();
-    const money = w2 => {
-      const s = top.addText(w2);
-      s.font = Font.mediumSystemFont(10.5);
-      s.textColor = mn.budget && mn.left < 0 ? PINK : GREEN;
-      s.lineLimit = 1;
-      s.minimumScaleFactor = 0.8;
-    };
-    money(mn.budget ? `남은 ${short(mn.left)}` : `지출 ${short(mn.spent)}`);
+    const box = top.addStack();
+    box.layoutVertically();
+    const l1 = box.addText(
+      `오늘 ${short(mn.today || 0)} · 달 ${short(mn.spent)}`);
+    l1.font = Font.systemFont(9.5);
+    l1.textColor = MUTED;
+    l1.rightAlignText();
+    l1.lineLimit = 1;
+    l1.minimumScaleFactor = 0.75;
+    if (mn.budget) {
+      const l2 = box.addText(`남은 ${short(mn.left)}`);
+      l2.font = Font.boldSystemFont(11.5);
+      l2.textColor = mn.left < 0 ? PINK : GREEN;
+      l2.rightAlignText();
+      l2.lineLimit = 1;
+      l2.minimumScaleFactor = 0.8;
+    }
   }
   w.addSpacer(5);
 

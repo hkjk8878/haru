@@ -575,7 +575,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v86';
+const APP_VER='v87';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1445,7 +1445,8 @@ function widgetSummary(){
       list:td.filter(x=>!x.done).slice(0,8).map(x=>x.title),
       all:td.slice().sort((a,b)=>(a.done===b.done?0:(a.done?1:-1))).slice(0,14)
         .map(x=>({t:x.title,d:!!x.done}))},
-    money:{spent,budget:bud,left:bud?bud-spent:0},
+    money:{spent,budget:bud,left:bud?bud-spent:0,
+      today:sum(outOnly(moneyOn(t)),r=>r.amount)},
     events:evs,
     next:next?{at:toTime(next.at),label:next.label}:null,
     week:(()=>{
