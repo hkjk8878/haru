@@ -34,7 +34,7 @@ const large = size === "large";
 
 const w = new ListWidget();
 w.backgroundColor = BG;
-w.setPadding(12, 13, 12, 13);
+w.setPadding(10, 12, 10, 12);
 w.url = OPEN;
 
 if (!data || data.error) {
@@ -53,15 +53,18 @@ if (!data || data.error) {
   const head = w.addStack();
   head.centerAlignContent();
   const title = head.addText(data.off ? "쉬는 날" : "오늘");
-  title.font = Font.boldSystemFont(13);
+  title.font = Font.boldSystemFont(12.5);
+  title.lineLimit = 1;
   title.textColor = data.off ? GOLD : INK;
   head.addSpacer();
   if (data.next && !small) {
-    const nx = head.addText(`${data.next.at}  ${data.next.label}`);
-    nx.font = Font.systemFont(10);
-    nx.textColor = MUTED; nx.lineLimit = 1;
+    const nx = head.addText(`${data.next.at} ${data.next.label}`);
+    nx.font = Font.systemFont(9.5);
+    nx.textColor = MUTED;
+    nx.lineLimit = 1;
+    nx.minimumScaleFactor = 0.8;
   }
-  w.addSpacer(7);
+  w.addSpacer(6);
 
   /* 숫자 줄 */
   const nums = w.addStack();
@@ -157,10 +160,26 @@ if (!data || data.error) {
         }
       }
     });
-  } else {
+  } else if (small) {
     const box = w.addStack();
     box.layoutVertically();
-    listInto(box, rows, small ? 3 : 4, small ? 11 : 12);
+    listInto(box, rows, 3, 11);
+  } else {
+    /* 중간 크기: 좌우 두 칸으로 나눠 8개까지 */
+    const cols = w.addStack();
+    cols.layoutHorizontally();
+    cols.topAlignContent();
+    const L = cols.addStack(); L.layoutVertically(); L.size = new Size(146, 0);
+    cols.addSpacer(8);
+    const R = cols.addStack(); R.layoutVertically(); R.size = new Size(146, 0);
+    const half = rows.slice(0, 8);
+    listInto(L, half.slice(0, 4), 4, 11);
+    if (half.length > 4) listInto(R, half.slice(4), 4, 11, true);
+    if (rows.length > 8) {
+      R.addSpacer(3);
+      const m = R.addText(`+${rows.length - 8}개 더`);
+      m.font = Font.systemFont(9.5); m.textColor = MUTED;
+    }
   }
 
   w.addSpacer();
@@ -187,8 +206,9 @@ function pair(stack, label, value, color) {
   v.font = Font.boldSystemFont(13); v.textColor = color;
 }
 
-function listInto(box, rows, max, fs) {
+function listInto(box, rows, max, fs, quiet) {
   if (!rows.length) {
+    if (quiet) return;
     const t = box.addText("남은 일정과 할 일이 없어요");
     t.font = Font.systemFont(11); t.textColor = MUTED; t.lineLimit = 2;
     return;

@@ -41,8 +41,8 @@ if (!data || data.error || !data.month) {
 } else {
   const mo = data.month;
   const [y, m] = mo.ym.split("-").map(Number);
-  const td = data.todo || { done: 0, total: 0 };
   const hb = data.habit || { done: 0, total: 0 };
+  const td = data.todo || { done: 0, total: 0 };
 
   /* 머리 */
   const head = w.addStack();
@@ -102,7 +102,7 @@ if (!data || data.error || !data.month) {
           t.lineLimit = 1;
           t.minimumScaleFactor = 0.9;
           t.textColor = isToday ? new Color("#0A1017")
-            : (x.k === "t" ? PINK : x.k === "g" ? GOLD : SKY);
+            : (x.k === "g" ? GOLD : SKY);
         });
         if (info.m) {
           const mm = cell.addText(`+${info.m}`);

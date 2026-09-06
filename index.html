@@ -575,7 +575,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v78';
+const APP_VER='v80';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -701,7 +701,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:32,
+    version:33,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -778,6 +778,7 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<33){ (d.calViews||[]).forEach((v,i)=>{v.ord=(v.ord===undefined?i:v.ord)}); d.version=33; }
   if(d.version<32){ (d.fixed||[]).forEach(f=>{f.dayM=f.dayM||{}}); d.version=32; }
   if(d.version<31){ (d.habits||[]).forEach(h=>{h.always=!!h.always}); d.version=31; }
   if(d.version<30){
@@ -1471,7 +1472,7 @@ function widgetSummary(){
         const arr=[];
         eventsOn(d).forEach(e=>arr.push({k:'e',t:e.title}));
         S.goals.forEach(g=>{ if(g.due===d) arr.push({k:'g',t:g.title}); });
-        todosOn(d).filter(x=>!x.done).forEach(x=>arr.push({k:'t',t:x.title}));
+        S.goals.forEach(g=>(g.steps||[]).forEach(x=>{ if(x.due===d) arr.push({k:'g',t:x.title}); }));
         if(arr.length) it[i]={a:arr.slice(0,2),m:Math.max(0,arr.length-2)};
       }
       return {ym,days:n,lead:(dow(first)+6)%7,today:+t.slice(8),ev,td:td2,full,it};
@@ -2171,8 +2172,9 @@ function calFilterBar(){
   const base=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표']];
   return `<div class="catbar">
     ${base.map(([k,l])=>`<button class="catchip ${calFilter===k?'on':''}" data-calfilter="${k}">${l}</button>`).join('')}
-    ${(S.calViews||[]).map(v=>`<button class="catchip ${calFilter==='v:'+v.id?'on':''}" data-calfilter="v:${v.id}">
-      ${esc(v.name)}</button>`).join('')}
+    ${(S.calViews||[]).slice().sort((a,b)=>((a.ord||0)-(b.ord||0))).map(v=>
+      `<button class="catchip ${calFilter==='v:'+v.id?'on':''}" data-calfilter="v:${v.id}">
+        ${esc(v.name)}</button>`).join('')}
     ${S.ecats.map(c=>`<button class="catchip ${calFilter==='ev:'+c.id?'on':''}" data-calfilter="ev:${c.id}">
       <u style="color:${calFilter==='ev:'+c.id?'var(--onAccent)':c.color}">●</u>${esc(c.name)}</button>`).join('')}
     <button class="catchip" data-cvsheet="${curCV()?curCV().id:''}" style="color:var(--habit)">
@@ -2197,19 +2199,20 @@ function vCal(){
     const hasNote=calFilter==='all'&&!!((S.logs[d]||{}).note||'').trim();
     const isOff=!!(S.logs[d]||{}).off;
     const items=[];
-    evShown(d).forEach(e=>items.push({c:ecatOf(e.catId).color,t:e.allDay?e.title:e.start.slice(0,5)+' '+e.title}));
+    evShown(d).forEach(e=>items.push({c:ecatOf(e.catId).color,
+      t:e.allDay?e.title:e.title+' '+e.start.slice(0,5)}));
     if(cfGoal()){
-      S.goals.forEach(g=>{ if(g.due===d) items.push({c:'var(--goal)',t:'D-DAY '+g.title}); });
+      S.goals.forEach(g=>{ if(g.due===d) items.push({c:'var(--goal)',t:g.title+' D-DAY'}); });
       S.goals.forEach(g=>(g.steps||[]).forEach(x=>{ if(x.due===d) items.push({c:'var(--goal)',t:x.title}); }));
     }
-    if(hasTd) items.push({c:'var(--task)',t:'할 일 '+todosOn(d).length});
-    if(mOut||mSav||mIn){
+    if(hasTd&&calFilter!=='all') items.push({c:'var(--task)',t:'할 일 '+todosOn(d).length});
+    if(cfMoney()){
       const oAmt=sum(outOnly(mo),x=>x.amount)+sum(savOnly(mo),x=>x.amount);
       const iAmt=sum(incOnly(mo),x=>x.amount);
-      const pl=planOnly(mo).length, fq=fxd.length;
       if(oAmt) items.push({c:'var(--task)',t:'−'+shortWon(oAmt)});
       if(iAmt) items.push({c:'#34D399',t:'+'+shortWon(iAmt)});
-      if(!oAmt&&!iAmt&&(pl||fq)) items.push({c:'var(--plan)',t:(pl?'예정':'고정')});
+      fxd.forEach(f=>items.push({c:'var(--goal)',t:f.name}));
+      planOnly(mo).forEach(x=>items.push({c:'var(--plan)',t:x.memo||mcatOf(x.catId).name}));
     }
     if(hasNote) items.push({c:'var(--muted)',t:'기록'});
     cells.push(`<button class="dc ${d===view?'sel':''} ${d===today()?'tod':''}" data-selday="${d}">
@@ -3084,6 +3087,9 @@ function cvSheet(id){
         <button type="button" data-cvopt="money" class="${sheetPick.cvMoney?'on':''}">가계부</button>
         <button type="button" data-cvopt="goal" class="${sheetPick.cvGoal?'on':''}">목표</button>
       </div></div>
+    ${v?`<div class="quick" style="margin-bottom:6px">
+      <button type="button" data-cvmove="${v.id}:-1">앞으로 옮기기</button>
+      <button type="button" data-cvmove="${v.id}:1">뒤로 옮기기</button></div>`:''}
     <div class="actions">${v?`<button class="del" data-delcv="${v.id}">삭제</button>`
       :'<button class="cancel" data-close="1">취소</button>'}
       <button class="save" data-savecv="${v?v.id:''}">저장</button></div>`);
@@ -3569,7 +3575,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -3987,8 +3993,21 @@ document.addEventListener('click',ev=>{
       money:sheetPick.cvMoney,goal:sheetPick.cvGoal};
     S.calViews||=[];
     if(d.savecv) Object.assign(S.calViews.find(x=>x.id===d.savecv),o);
-    else { const id2=uid(); S.calViews.push({id:id2,...o}); calFilter='v:'+id2; }
+    else { const id2=uid();
+      S.calViews.push({id:id2,...o,ord:S.calViews.length});
+      calFilter='v:'+id2; }
     save();closeSheet();render();toast('보기 묶음을 저장했어요');
+    return;
+  }
+  if(d.cvmove){
+    const [vid,dir]=d.cvmove.split(':');
+    const list=(S.calViews||[]).slice().sort((a,b)=>((a.ord||0)-(b.ord||0)));
+    list.forEach((x,i)=>{x.ord=i});
+    const i=list.findIndex(x=>x.id===vid), j=i+(+dir);
+    if(i>=0&&j>=0&&j<list.length){
+      const tmp=list[i].ord; list[i].ord=list[j].ord; list[j].ord=tmp;
+      save();closeSheet();render();toast('순서를 바꿨어요');
+    } else { toast('더 옮길 곳이 없어요'); }
     return;
   }
   if(d.delcv){
@@ -4303,7 +4322,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:32,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:33,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
