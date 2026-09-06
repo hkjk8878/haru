@@ -299,7 +299,10 @@ input,select,textarea{font:inherit;color:inherit}
 .seg button{flex:1;text-align:center;padding:9px 0;border-radius:11px;font-size:13.5px;
   font-weight:650;color:var(--muted)}
 .seg button.on{background:var(--habit);color:var(--onAccent)}
-.catbar{display:flex;gap:7px;overflow-x:auto;padding:12px 16px 2px;margin:0 -16px;scrollbar-width:none}
+.catbar{display:flex;flex-wrap:nowrap;gap:7px;overflow-x:auto;overflow-y:hidden;
+  padding:12px 16px 4px;margin:0 -16px;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.catbar>*{flex:0 0 auto}
 .catbar::-webkit-scrollbar{display:none}
 .catchip{flex:none;font-size:12.5px;font-weight:650;padding:7px 12px;border-radius:999px;
   background:var(--card);box-shadow:var(--shadow);color:var(--muted)}
@@ -575,7 +578,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v87';
+const APP_VER='v88';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2180,6 +2183,8 @@ const cfEvCats=()=>{
   return [];
 };
 const cfTodo=()=>calFilter==='all'||calFilter==='todo'||!!(curCV()&&curCV().todo);
+/* 달력에서 항목끼리 색이 겹치지 않게 쓰는 고정 색 */
+const MC={out:'#FF8A5C',inc:'#34D399',sav:'#22D3EE',fix:'#A78BFA',plan:'#C084FC'};
 const cfMoney=()=>calFilter==='all'||calFilter==='money'||!!(curCV()&&curCV().money);
 const cfGoal=()=>calFilter==='all'||calFilter==='goal'||!!(curCV()&&curCV().goal);
 const evShown=d=>{const cs=cfEvCats();return eventsOn(d).filter(e=>cs===null||cs.indexOf(e.catId)>=0)};
@@ -2223,12 +2228,14 @@ function vCal(){
     }
     if(hasTd&&calFilter!=='all') items.push({c:'var(--task)',t:'할 일 '+todosOn(d).length});
     if(cfMoney()){
-      const oAmt=sum(outOnly(mo),x=>x.amount)+sum(savOnly(mo),x=>x.amount);
+      const oAmt=sum(outOnly(mo),x=>x.amount);
+      const sAmt=sum(savOnly(mo),x=>x.amount);
       const iAmt=sum(incOnly(mo),x=>x.amount);
-      if(oAmt) items.push({c:'var(--task)',t:'−'+shortWon(oAmt)});
-      if(iAmt) items.push({c:'#34D399',t:'+'+shortWon(iAmt)});
-      fxd.forEach(f=>items.push({c:'var(--goal)',t:f.name}));
-      planOnly(mo).forEach(x=>items.push({c:'var(--plan)',t:x.memo||mcatOf(x.catId).name}));
+      if(oAmt) items.push({c:MC.out,t:'−'+shortWon(oAmt)});
+      if(iAmt) items.push({c:MC.inc,t:'+'+shortWon(iAmt)});
+      if(sAmt) items.push({c:MC.sav,t:'↓'+shortWon(sAmt)});
+      fxd.forEach(f=>items.push({c:MC.fix,t:f.name}));
+      planOnly(mo).forEach(x=>items.push({c:MC.plan,t:x.memo||mcatOf(x.catId).name}));
     }
     if(hasNote) items.push({c:'var(--muted)',t:'기록'});
     cells.push(`<button class="dc ${d===view?'sel':''} ${d===today()?'tod':''}" data-selday="${d}">
@@ -2245,7 +2252,8 @@ function vCal(){
     .sort((a,b)=>a.date<b.date?-1:1);
 
   return `<div class="top"><div class="datenav"><div><h1>달력</h1>
-      <p class="sub">가계부 점 — 지출 분홍, 수입 초록, 저축 파랑. 회색은 한 줄 기록이에요.</p></div>
+      <p class="sub">일정은 분류 색 · 목표 노랑 · 할 일 분홍 · 지출 주황 · 수입 초록 ·
+      저축 청록 · 고정 보라 · 예정 연보라</p></div>
       <button class="pill" data-newev="1">＋ 일정</button></div>
       ${calFilterBar()}</div>
     <div class="card">
@@ -2269,7 +2277,7 @@ function vCal(){
       ${cfMoney()?fixOn(view).map(f=>{
         const c=mcatOf(f.catId);
         const done=S.money.some(m=>m.fx===f.id+':'+monthOf(view));
-        const fcl=f.type==='in'?'#34D399':(c.sv?'var(--plan)':'var(--task)');
+        const fcl=MC.fix;
         return `<div class="ev" style="border-left-color:${fcl}">
           <span class="tm" style="color:${fcl}">고정 ${f.type==='in'?'수입':'지출'}</span>
           <span class="bd"><b style="font-weight:600">${esc(f.name)}</b>
@@ -2278,9 +2286,9 @@ function vCal(){
       }).join(''):''}
       ${cfMoney()?planOnly(moneyOn(view)).map(x=>{
         const c=mcatOf(x.catId);
-        const cl=x.type==='in'?'#34D399':(c.sv?'var(--plan)':'var(--task)');
+        const cl=MC.plan;
         return `<div class="ev" style="border-left-color:${cl};border-left-style:dashed">
-          <span class="tm" style="color:${cl}">예정</span>
+          <span class="tm" style="color:${cl}">예정 ${x.type==='in'?'수입':(c.sv?'저축':'지출')}</span>
           <span class="bd"><b style="font-weight:600">${esc(x.memo||c.name)}${x.notify?' 🔔':''}</b>
             <small>${esc(c.name)}${x.time?' · '+x.time:''} · ${won(x.amount)}</small></span>
           <button class="fadd" data-planok="${x.id}">완료</button></div>`;
@@ -2288,7 +2296,7 @@ function vCal(){
       ${cfMoney()?moneyOn(view).filter(v=>!v.plan).map(mm=>{
         const c=mcatOf(mm.catId);
         return `<button class="ev" data-tx="${mm.id}" style="border-left-color:${c.color}">
-          <span class="tm" style="color:${mm.type==='in'?'#34D399':c.sv?'var(--plan)':'var(--task)'}">${mm.type==='in'?'수입':c.sv?'저축':'지출'}</span>
+          <span class="tm" style="color:${mm.type==='in'?MC.inc:c.sv?MC.sav:MC.out}">${mm.type==='in'?'수입':c.sv?'저축':'지출'}</span>
           <span class="bd"><b style="font-weight:600">${esc(mm.memo||c.name)}</b>
             <small>${esc(c.name)}</small></span>
           <span class="bell ${mm.type==='in'?'in':c.sv?'sav':'out'}" style="font-weight:700">${mm.type==='in'?'+':'−'}${shortWon(mm.amount)}</span></button>`;
