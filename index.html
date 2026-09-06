@@ -22,6 +22,7 @@
   --task:#F2789A; --task-soft:#33202A;
   --habit:#56B7F2; --habit-soft:#152C3D;
   --goal:#E5B15E; --goal-soft:#332816;
+  --danger:#F2685F; --danger-soft:#3A2320;
   --h0:#1C2028; --h1:#173A4E; --h2:#1E5B7C; --h3:#2E8CB8; --h4:#56B7F2;
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.30);
 }
@@ -64,13 +65,15 @@ input,select,textarea{font:inherit;color:inherit}
 .modebar .mb{flex:1;font-size:13px;color:var(--goal)}
 .modebar .mb b{font-size:14.5px;font-weight:750}
 .modebar .ms{flex:none;font-size:11px;color:var(--goal);opacity:.8}
-.yearbar{display:block;width:100%;background:var(--card);border-radius:16px;padding:12px 14px 13px;
-  box-shadow:var(--shadow);margin-top:14px}
-.yearbar .yl{display:block;font-size:13.5px;color:var(--muted)}
-.yearbar .yl b{font-size:14.5px;font-weight:750;color:var(--ink);letter-spacing:-.01em}
-.yearbar .bar{margin-top:9px}
-.yearbar .bar i{background:linear-gradient(90deg,var(--plan),var(--habit))}
-.yearbar .ys{display:block;margin-top:6px;font-size:11.5px;color:var(--muted);text-align:right}
+.yearbar{display:flex;align-items:center;gap:9px;width:100%;background:var(--card);
+  border-radius:14px;padding:9px 13px;box-shadow:var(--shadow);margin-top:12px}
+.yearbar .yl{flex:none;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.yearbar .yl b{font-size:13.5px;font-weight:750;color:var(--ink);margin-right:5px}
+.yearbar .ymo{flex:1;display:flex;gap:2px;min-width:0}
+.yearbar .ymo i{flex:1;height:8px;border-radius:3px;background:var(--h0);display:block}
+.yearbar .ymo i.past{background:var(--h3)}
+.yearbar .ymo i.now{background:var(--habit)}
+.yearbar .ys{flex:none;font-size:11.5px;font-weight:700;color:var(--muted)}
 .gauges{display:flex;gap:8px;margin-top:14px}
 .gauge{flex:1;background:var(--card);border-radius:16px;padding:11px 12px 12px;box-shadow:var(--shadow);min-width:0}
 .gauge .lab{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--muted);gap:4px}
@@ -361,8 +364,8 @@ input,select,textarea{font:inherit;color:inherit}
 .lnrow .x{color:var(--muted);font-size:16px;opacity:.55;flex:none;padding:0 2px}
 .pastnote em{font-style:normal;font-size:11.5px;color:var(--muted);font-weight:650}
 .pastnote p{margin:3px 0 0;font-size:13.5px}
-.danger{margin:0 16px 16px;font-size:13px;font-weight:650;color:var(--task);
-  background:var(--task-soft);padding:12px;border-radius:12px;width:calc(100% - 32px);text-align:center}
+.danger{margin:0 16px 16px;font-size:13px;font-weight:650;color:var(--danger);
+  background:var(--danger-soft);padding:12px;border-radius:12px;width:calc(100% - 32px);text-align:center}
 
 .calnav{display:flex;align-items:center;gap:10px;padding:15px 16px 6px}
 .calnav b{font-size:15.5px;font-weight:700}
@@ -555,7 +558,7 @@ nav button.on{color:var(--ink)}
 .sheet .actions{display:flex;gap:9px;margin-top:18px}
 .sheet .save{flex:1;background:var(--habit);color:var(--onAccent);font-size:15px;font-weight:750;
   padding:14px;border-radius:14px;text-align:center}
-.sheet .del{background:var(--task-soft);color:var(--task);font-size:14px;font-weight:700;padding:14px 16px;border-radius:14px}
+.sheet .del{background:var(--danger-soft);color:var(--danger);font-size:14px;font-weight:700;padding:14px 16px;border-radius:14px}
 .sheet .cancel{background:var(--card2);color:var(--muted);font-size:14px;font-weight:650;padding:14px 16px;border-radius:14px}
 .err{font-size:12.5px;color:var(--task);font-weight:600;margin:0 0 10px;display:none}
 .err.on{display:block}
@@ -582,9 +585,10 @@ body.px-night{
   --ink:#F2E9D2; --muted:#B7ADD6; --line:#564B85;
   --cell:#2C2547; --cell2:#3A3159; --onAccent:#17142A;
   --plan:#D8B26A; --plan-soft:#3B3020;
-  --task:#E8934A; --task-soft:#43301C;
+  --task:#E8A24E; --task-soft:#43301C;
   --habit:#F5C542; --habit-soft:#453718;
-  --goal:#F0DC8A; --goal-soft:#3E3722;
+  --goal:#E5A93E; --goal-soft:#3E3722;
+  --danger:#EC7A6C; --danger-soft:#452A28;
   --h0:#2C2547; --h1:#453718; --h2:#7A6026; --h3:#B99534; --h4:#F5C542;
   --pxB:#F2E9D2; --pxHi:rgba(255,255,255,.12); --pxBtn:#3E3562;
   --pxNav:#221D3B; --pxNavHi:#413769; --pxNavInk:#F2E9D2;
@@ -599,6 +603,7 @@ body.px-book{
   --task:#B4402C; --task-soft:#F3D7CE;
   --habit:#3F7A31; --habit-soft:#D9E9C6;
   --goal:#96690F; --goal-soft:#F3E3BC;
+  --danger:#A8382A; --danger-soft:#F5D9D1;
   --h0:#E2CDA5; --h1:#D6E7BE; --h2:#A9CE90; --h3:#6FA55A; --h4:#3F7A31;
   --pxB:#3A2A22; --pxHi:rgba(255,255,255,.55); --pxBtn:#EFE0C0;
   --pxNav:#3A2A22; --pxNavHi:#5A4234; --pxNavInk:#F7EBD3;
@@ -640,7 +645,11 @@ body.pixel .dayspick button.on{
 }
 body.pixel .save,body.pixel .pill.h{background:var(--habit);color:var(--onAccent)}
 body.pixel .pill.g{background:var(--goal);color:var(--onAccent)}
-body.pixel .del{background:var(--task);color:#FFF3F0}
+body.pixel .del,body.pixel .danger{
+  background:var(--danger-soft);color:var(--danger);
+  border:2px solid var(--danger);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.1), 0 2px 0 var(--danger);
+  font-weight:400}
 
 body.pixel .top h1{font-size:21px}
 body.pixel .sub,body.pixel .hint,body.pixel .tip,body.pixel .empty{color:var(--muted)}
@@ -711,7 +720,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v95';
+const APP_VER='v100';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1984,9 +1993,12 @@ function header(){
     </div>
     ${(()=>{const y=yearLeft();
       return `<button class="yearbar" data-tab="stat">
-        <span class="yl"><b>${y.y}년</b> ${y.left>0?`${y.left}일 남았어요`:y.left===0?'오늘이 마지막 날이에요':'새해가 됐어요'}</span>
-        <span class="bar"><i style="width:${Math.min(100,y.pct*100)}%"></i></span>
-        <span class="ys">${Math.round(y.pct*100)}% 지남</span></button>`;})()}
+        <span class="yl"><b>${y.y}년</b> ${y.left>0?`${y.left}일 남음`:y.left===0?'오늘이 마지막 날':'새해'}</span>
+        <span class="ymo">${Array.from({length:12},(_,i)=>i+1).map(m=>{
+          const mm=`${y.y}-${pad(m)}`, cur=monthOf(today());
+          return `<i class="${mm===cur?'now':mm<cur?'past':''}"></i>`;
+        }).join('')}</span>
+        <span class="ys">${Math.round(y.pct*100)}%</span></button>`;})()}
     <div class="gauges">
       <div class="gauge g-habit"><div class="lab">습관 <b>${dayOff(view)?'쉼':hd}<s>${dayOff(view)?'':'/'+hTot}</s></b></div>
         <div class="bar"><i style="width:${hTot?hd/hTot*100:0}%"></i></div></div>
@@ -2404,7 +2416,7 @@ function vCal(){
   return `<div class="top"><div class="datenav"><div><h1>달력</h1>
       <p class="sub">일정은 분류 색 · 목표 노랑 · 할 일 분홍 · 지출 주황 · 수입 초록 ·
       저축 청록 · 고정 보라 · 예정 연보라</p></div>
-      <button class="pill" data-newev="1">＋ 일정</button></div>
+      <button class="pill h" data-newev="1">＋ 일정</button></div>
       ${calFilterBar()}</div>
     <div class="card">
       <div class="calnav"><button data-cal="${prevM}">‹</button><b>${y}년 ${m}월</b>
@@ -2634,7 +2646,7 @@ function vMoney(){
           <div style="font-size:12.5px;color:var(--muted)">남은 돈<b style="display:block;font-size:15px;color:${inc-out-sav>=0?'#34D399':'var(--task)'}">${won(inc-out-sav)}</b></div>
         </div>
         ${b?`<div class="bar" style="height:7px;margin-top:14px"><i style="width:${Math.min(100,out/b*100)}%;
-            background:${out>b?'var(--task)':'linear-gradient(90deg,var(--goal),var(--task))'}"></i></div>
+            background:${out>b?'var(--danger)':'var(--goal)'}"></i></div>
           <div style="margin-top:8px;font-size:12px;color:var(--muted)">예산 ${won(b)} · ${left>=0?`${won(left)} 남음`:`${won(-left)} 넘음`}
             ${restDays&&left>0?` · 하루 ${won(Math.round(left/restDays))}`:''}</div>`:''}
         <button class="pill g" style="margin:11px 0 0" data-budget="1">${m}월 예산 ${b?'수정':'설정'}</button>
@@ -2674,26 +2686,6 @@ function vMoney(){
 }
 
 
-function yearCard(){
-  return `${(()=>{const y=yearLeft();
-      const months=Array.from({length:12},(_,i)=>i+1);
-      const ym=monthOf(today());
-      return `<div class="card"><header><h2>${y.y}년</h2>
-        <span class="count">${y.left>0?y.left+'일 남음':'마지막 날'}</span></header>
-        <div style="padding:12px 16px 4px">
-          <div style="font-size:26px;font-weight:780;letter-spacing:-.03em">${y.passed}<span style="font-size:15px;font-weight:600;color:var(--muted)">일 / ${y.total}일</span></div>
-          <div class="bar" style="margin-top:10px;height:7px"><i style="width:${y.pct*100}%;background:linear-gradient(90deg,var(--plan),var(--habit))"></i></div>
-          <div style="margin-top:8px;font-size:12px;color:var(--muted)">올해의 ${Math.round(y.pct*100)}%가 지났어요. 남은 ${y.left}일이 ${Math.round((1-y.pct)*100)}%입니다.</div>
-        </div>
-        <div style="display:flex;gap:3px;padding:14px 16px 16px">${months.map(m=>{
-          const mm=`${y.y}-${pad(m)}`;
-          const past=mm<ym, now=mm===ym;
-          return `<span style="flex:1;height:24px;border-radius:6px;display:grid;place-items:center;
-            font-size:9.5px;font-weight:${now?'750':'500'};
-            background:${past?'var(--h3)':now?'var(--habit)':'var(--h0)'};
-            color:${now?'var(--onAccent)':past?'#fff':'var(--muted)'}">${m}</span>`;
-        }).join('')}</div></div>`;})()}`;
-}
 function linesCard(){
   return `<div class="card"><header><h2>오늘의 문장</h2>
       <span class="count">${S.lines.length?'내 문장 '+S.lines.length+'개':'기본만'}</span>
@@ -2788,8 +2780,7 @@ function vStat(){
       <button data-stat="month" class="${statMode==='month'?'on':''}">월간</button>
       <button data-stat="green" class="${statMode==='green'?'on':''}">달력</button>
     </div></div>`+
-    (statMode==='week'?statWeek():statMode==='green'?statGreen():statMonthView())+
-    yearCard();
+    (statMode==='week'?statWeek():statMode==='green'?statGreen():statMonthView());
 }
 function vSet(){
   return `<div class="top"><div class="datenav"><div><h1>설정</h1>
@@ -2810,7 +2801,7 @@ function vSet(){
           <div class="prev"><em>주소</em><span style="font-size:11.5px;word-break:break-all">${esc(S.push.url.replace(/\/$/,''))}/summary?room=${esc(S.sync.room)}</span></div>
            <button class="addbtn" style="color:var(--habit)" data-copywidget="1">주소 복사하기</button>
            <button class="addbtn" data-pushsum="1">지금 요약 올리기</button>`
-        :'<div class="empty" style="color:var(--task)">먼저 동기화와 폰 알림을 연결해 주세요.</div>'}
+        :'<div class="empty" style="color:var(--danger)">먼저 동기화와 폰 알림을 연결해 주세요.</div>'}
     </div>
     <div class="card"><header><h2>앱 버전</h2>
       <span class="count">${APP_VER}</span></header>
