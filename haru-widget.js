@@ -103,7 +103,7 @@ if (!data || data.error) {
 
   /* 목록 (+ 큰 위젯이면 오른쪽에 달력) */
   const rows = [];
-  (data.events || []).forEach(e => rows.push({ c: SKY,  k: e.t, t: e.n }));
+  (data.events || []).forEach(e => rows.push({ c: e.c ? new Color(e.c) : SKY, k: e.t, t: e.n }));
   (td.list || []).forEach(x     => rows.push({ c: PINK, k: "○",  t: x }));
 
   if (large) {
@@ -146,7 +146,8 @@ if (!data || data.error) {
           s2.centerAlignContent();
           const kk = s2.addText(it.k);
           kk.font = Font.mediumSystemFont(9);
-          kk.textColor = it.k === "○" ? PINK : (it.k === "D" ? GOLD : SKY);
+          kk.textColor = it.k === "○" ? PINK
+            : (it.c ? new Color(it.c) : (it.k === "D" ? GOLD : SKY));
           s2.addSpacer(5);
           const tt = s2.addText(it.t);
           tt.font = Font.systemFont(10.5);

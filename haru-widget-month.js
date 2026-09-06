@@ -106,7 +106,7 @@ if (!data || data.error || !data.month) {
           t.lineLimit = 1;
           t.minimumScaleFactor = 0.9;
           t.textColor = isToday ? new Color("#0A1017")
-            : (x.k === "g" ? GOLD : SKY);
+            : (x.c ? new Color(x.c) : (x.k === "g" ? GOLD : SKY));
         });
         if (info.m) {
           const mm = cell.addText(`+${info.m}`);

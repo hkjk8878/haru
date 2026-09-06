@@ -575,7 +575,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v80';
+const APP_VER='v81';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1436,7 +1436,7 @@ function widgetSummary(){
   const bud=budgetFor(ym);
   const nm=nowMin();
   const next=alarmsFor(t).filter(a=>a.at>=nm).sort((a,b)=>a.at-b.at)[0];
-  const evs=eventsOn(t).slice(0,6).map(e=>({t:e.allDay?'하루':e.start,n:e.title}));
+  const evs=eventsOn(t).slice(0,6).map(e=>({t:e.allDay?'하루':e.start,n:e.title,c:ecatOf(e.catId).color}));
   return {
     date:t, off:dayOff(t),
     habit:{done,total:tot},
@@ -1450,9 +1450,9 @@ function widgetSummary(){
       for(let i=0;i<7;i++){
         const d=addDays(t,i);
         const items=[];
-        eventsOn(d).forEach(e=>items.push({k:e.allDay?'하루':e.start,t:e.title}));
+        eventsOn(d).forEach(e=>items.push({k:e.allDay?'하루':e.start,t:e.title,c:ecatOf(e.catId).color}));
         todosOn(d).filter(x=>!x.done).forEach(x=>items.push({k:'○',t:x.title}));
-        S.goals.forEach(g=>{ if(g.due===d) items.push({k:'D',t:g.title}); });
+        S.goals.forEach(g=>{ if(g.due===d) items.push({k:'D',t:g.title,c:'#E5B15E'}); });
         out.push({d,dow:DAYS[dow(d)],day:+d.slice(8),items:items.slice(0,3),more:Math.max(0,items.length-3)});
       }
       return out;
@@ -1470,9 +1470,9 @@ function widgetSummary(){
       for(let i=1;i<=n;i++){
         const d=`${ym}-${pad(i)}`;
         const arr=[];
-        eventsOn(d).forEach(e=>arr.push({k:'e',t:e.title}));
-        S.goals.forEach(g=>{ if(g.due===d) arr.push({k:'g',t:g.title}); });
-        S.goals.forEach(g=>(g.steps||[]).forEach(x=>{ if(x.due===d) arr.push({k:'g',t:x.title}); }));
+        eventsOn(d).forEach(e=>arr.push({k:'e',t:e.title,c:ecatOf(e.catId).color}));
+        S.goals.forEach(g=>{ if(g.due===d) arr.push({k:'g',t:g.title,c:'#E5B15E'}); });
+        S.goals.forEach(g=>(g.steps||[]).forEach(x=>{ if(x.due===d) arr.push({k:'g',t:x.title,c:'#E5B15E'}); }));
         if(arr.length) it[i]={a:arr.slice(0,2),m:Math.max(0,arr.length-2)};
       }
       return {ym,days:n,lead:(dow(first)+6)%7,today:+t.slice(8),ev,td:td2,full,it};
