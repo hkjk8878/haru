@@ -94,7 +94,11 @@ if (!data || data.error || !data.month) {
       num.font = isToday ? Font.boldSystemFont(9.5) : Font.systemFont(9.5);
       num.textColor = isToday ? new Color("#0A1017") : (c >= 5 ? PINK : INK);
 
-      const info = (mo.it || {})[d];
+      const raw = (mo.it || {})[d];
+      /* 할 일(k==='t')은 달력에 넣지 않는다 */
+      const keep = raw ? (raw.a || []).filter(x => x.k !== "t") : [];
+      const hidden = raw ? (raw.m || 0) + ((raw.a || []).length - keep.length) : 0;
+      const info = keep.length ? { a: keep, m: raw.m || 0 } : null;
       if (info) {
         info.a.forEach(x => {
           const t = cell.addText(x.t);
