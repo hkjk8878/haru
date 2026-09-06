@@ -23,8 +23,11 @@ const LINE  = new Color("#2A2F3A");
 
 let data = null;
 try {
-  const r = new Request(URL);
+  /* 위젯이 예전 응답을 붙잡지 않도록 매번 다른 주소로 요청한다 */
+  const bust = (URL.indexOf("?") >= 0 ? "&" : "?") + "_=" + Date.now();
+  const r = new Request(URL + bust);
   r.timeoutInterval = 8;
+  r.headers = { "cache-control": "no-cache", "pragma": "no-cache" };
   data = await r.loadJSON();
 } catch (e) { data = null; }
 
@@ -190,7 +193,7 @@ if (!data || data.error) {
   foot.rightAlignText();
 }
 
-w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+w.refreshAfterDate = new Date(Date.now() + 10 * 60 * 1000);
 if (config.runsInWidget) Script.setWidget(w);
 else if (large) await w.presentLarge();
 else await w.presentMedium();

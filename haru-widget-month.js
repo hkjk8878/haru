@@ -22,8 +22,11 @@ const CELL  = new Color("#1F232C");
 
 let data = null;
 try {
-  const r = new Request(URL);
+  /* 위젯이 예전 응답을 붙잡지 않도록 매번 다른 주소로 요청한다 */
+  const bust = (URL.indexOf("?") >= 0 ? "&" : "?") + "_=" + Date.now();
+  const r = new Request(URL + bust);
   r.timeoutInterval = 8;
+  r.headers = { "cache-control": "no-cache", "pragma": "no-cache" };
   data = await r.loadJSON();
 } catch (e) { data = null; }
 
@@ -125,7 +128,7 @@ if (!data || data.error || !data.month) {
   foot.rightAlignText();
 }
 
-w.refreshAfterDate = new Date(Date.now() + 20 * 60 * 1000);
+w.refreshAfterDate = new Date(Date.now() + 10 * 60 * 1000);
 if (config.runsInWidget) Script.setWidget(w);
 else await w.presentLarge();
 Script.complete();
