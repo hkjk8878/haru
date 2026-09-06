@@ -221,6 +221,28 @@ export default {
       return json({ ok: true, saved: true, rev });
     }
 
+    /* 위젯용 요약 저장·조회 */
+    if (url.pathname === '/summary') {
+      const room = String(url.searchParams.get('room') || '').trim();
+      if (!/^[A-Za-z0-9._-]{4,40}$/.test(room)) return json({ error: 'room 형식이 맞지 않아요' }, 400);
+      const key = 'sum:' + room;
+
+      if (req.method === 'POST') {
+        let b;
+        try { b = await req.json(); } catch (e) { return json({ error: '잘못된 요청' }, 400); }
+        await env.HARU.put(key, JSON.stringify({ ...b, at: new Date().toISOString() }));
+        return json({ ok: true });
+      }
+
+      const raw = await env.HARU.get(key);
+      if (!raw) return json({ error: '아직 올라온 요약이 없어요' }, 404);
+      return new Response(raw, {
+        headers: { 'content-type': 'application/json; charset=utf-8',
+                   'access-control-allow-origin': '*',
+                   'cache-control': 'no-store' }
+      });
+    }
+
     if (url.pathname === '/key') {
       if (!env.VAPID_PUBLIC) return json({ error: 'VAPID_PUBLIC 환경 변수가 없어요' }, 500);
       return json({ key: env.VAPID_PUBLIC });
