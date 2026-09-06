@@ -575,7 +575,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v84';
+const APP_VER='v86';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1449,14 +1449,15 @@ function widgetSummary(){
     events:evs,
     next:next?{at:toTime(next.at),label:next.label}:null,
     week:(()=>{
-      const out=[];
+      const out=[], mon=monStart(t);
       for(let i=0;i<7;i++){
-        const d=addDays(t,i);
+        const d=addDays(mon,i);
         const items=[];
         eventsOn(d).forEach(e=>items.push({k:e.allDay?'하루':e.start,t:e.title,c:ecatOf(e.catId).color}));
-        todosOn(d).filter(x=>!x.done).forEach(x=>items.push({k:'○',t:x.title}));
         S.goals.forEach(g=>{ if(g.due===d) items.push({k:'D',t:g.title,c:'#E5B15E'}); });
-        out.push({d,dow:DAYS[dow(d)],day:+d.slice(8),items:items.slice(0,3),more:Math.max(0,items.length-3)});
+        S.goals.forEach(g=>(g.steps||[]).forEach(x=>{ if(x.due===d) items.push({k:'D',t:x.title,c:'#E5B15E'}); }));
+        out.push({d,dow:DAYS[dow(d)],day:+d.slice(8),today:d===t,
+          items:items.slice(0,2),more:Math.max(0,items.length-2)});
       }
       return out;
     })(),
@@ -1482,7 +1483,7 @@ function widgetSummary(){
     })()
   };
 }
-let sumTimer=null, lastSumJSON='';
+let sumTimer=null, lastSumJSON='', sumAt='';
 function sumAuto(){
   if(!S.sync.room||!S.push.url) return;
   clearTimeout(sumTimer);
@@ -1496,6 +1497,9 @@ async function pushSummary(){
     await fetch(S.push.url.replace(/\/$/,'')+'/summary?room='+encodeURIComponent(S.sync.room),
       {method:'POST',headers:{'content-type':'application/json'},body});
     lastSumJSON=body;
+    sumAt=nowHM();
+    const el2=document.getElementById('sumAt');
+    if(el2) el2.textContent=sumAt;
   }catch(e){}
 }
 async function syncUp(silent){
@@ -2637,7 +2641,8 @@ function vSet(){
       <div class="empty" style="padding-bottom:8px">아이폰 홈 화면에 오늘 진행률을 띄울 수 있어요.
         무료 앱 <b>Scriptable</b>이 필요합니다. 아래를 눌러 주소를 확인하세요.</div>
       ${(S.sync.room&&S.push.url)
-        ?`<div class="prev"><em>주소</em><span style="font-size:11.5px;word-break:break-all">${esc(S.push.url.replace(/\/$/,''))}/summary?room=${esc(S.sync.room)}</span></div>
+        ?`<div class="prev"><em>마지막 올림</em><span id="sumAt">${sumAt||'아직 없음'}</span></div>
+          <div class="prev"><em>주소</em><span style="font-size:11.5px;word-break:break-all">${esc(S.push.url.replace(/\/$/,''))}/summary?room=${esc(S.sync.room)}</span></div>
            <button class="addbtn" style="color:var(--habit)" data-copywidget="1">주소 복사하기</button>
            <button class="addbtn" data-pushsum="1">지금 요약 올리기</button>`
         :'<div class="empty" style="color:var(--task)">먼저 동기화와 폰 알림을 연결해 주세요.</div>'}

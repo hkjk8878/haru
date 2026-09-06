@@ -122,19 +122,23 @@ if (!data || data.error || !data.month) {
   }
 
   w.addSpacer();
-  const foot = w.addText(hhmm());
+  const foot = w.addText(hhmm(data && data.at));
   foot.font = Font.systemFont(8);
   foot.textColor = FAINT;
   foot.rightAlignText();
 }
 
-w.refreshAfterDate = new Date(Date.now() + 10 * 60 * 1000);
+w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
 if (config.runsInWidget) Script.setWidget(w);
 else await w.presentLarge();
 Script.complete();
 
-function hhmm() {
-  const d = new Date();
+function hhmm(at) {
   const p = x => String(x).padStart(2, "0");
-  return `${p(d.getHours())}:${p(d.getMinutes())} 기준`;
+  const now = new Date();
+  const cur = `${p(now.getHours())}:${p(now.getMinutes())}`;
+  if (!at) return `${cur} 확인`;
+  const d = new Date(at);
+  const dat = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `기록 ${dat} · 확인 ${cur}`;
 }

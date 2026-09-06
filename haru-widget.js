@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────────
-//  하루 — 아이폰 홈 화면 위젯 (Scriptable 용)
+//  하루 — 오늘 위젯 (Scriptable 용)
 //
 //  1) URL 을 하루 앱 설정 탭 → 홈 화면 위젯 → 주소 복사하기 로 바꾸세요
 //  2) Scriptable 에 붙여넣고 "하루" 로 저장
-//  3) 홈 화면 → 위젯 추가 → Scriptable → 위젯 편집 → Script: 하루
-//
-//  큰 위젯은 오늘 목록 + 이번 주 5일치 일정을 함께 보여줍니다.
+//  3) 홈 화면 → 위젯 추가 → 위젯 편집 → Script: 하루
+//     When Interacting 은 Open App 그대로 두세요
 // ─────────────────────────────────────────────
 
 const URL  = "https://haru-alarm.hkjk8878.workers.dev/summary?room=여기에_동기화_코드";
@@ -17,13 +16,12 @@ const GREEN = new Color("#34D399");
 const GOLD  = new Color("#E5B15E");
 const INK   = new Color("#E9EBF2");
 const MUTED = new Color("#8A90A0");
-const FAINT = new Color("#565C6B");
+const FAINT = new Color("#5A6070");
 const BG    = new Color("#181B22");
 const LINE  = new Color("#2A2F3A");
 
 let data = null;
 try {
-  /* 위젯이 예전 응답을 붙잡지 않도록 매번 다른 주소로 요청한다 */
   const bust = (URL.indexOf("?") >= 0 ? "&" : "?") + "_=" + Date.now();
   const r = new Request(URL + bust);
   r.timeoutInterval = 8;
@@ -37,221 +35,186 @@ const large = size === "large";
 
 const w = new ListWidget();
 w.backgroundColor = BG;
-w.setPadding(10, 12, 10, 12);
+w.setPadding(9, 11, 9, 11);
 w.url = OPEN;
 
 if (!data || data.error) {
   const t = w.addText("하루");
-  t.font = Font.boldSystemFont(15); t.textColor = INK;
-  w.addSpacer(6);
+  t.font = Font.boldSystemFont(14); t.textColor = INK;
+  w.addSpacer(5);
   const e = w.addText(data && data.error ? data.error : "불러오지 못했어요");
   e.font = Font.systemFont(11); e.textColor = MUTED; e.lineLimit = 3;
 } else {
   const hb = data.habit || { done: 0, total: 0 };
-  const td = data.todo  || { done: 0, total: 0, list: [] };
+  const td = data.todo  || { done: 0, total: 0, list: [], all: [] };
   const mn = data.money || { spent: 0, budget: 0, left: 0 };
   const pct = hb.total ? hb.done / hb.total : 0;
 
-  /* 윗줄 */
-  const head = w.addStack();
-  head.centerAlignContent();
-  const title = head.addText(data.off ? "쉬는 날" : "오늘");
-  title.font = Font.boldSystemFont(12.5);
-  title.lineLimit = 1;
-  title.textColor = data.off ? GOLD : INK;
-  head.addSpacer();
-  if (data.next && !small) {
-    const nx = head.addText(`${data.next.at} ${data.next.label}`);
-    nx.font = Font.systemFont(9.5);
-    nx.textColor = MUTED;
-    nx.lineLimit = 1;
-    nx.minimumScaleFactor = 0.8;
-  }
-  w.addSpacer(6);
-
-  /* 숫자 줄 */
-  const nums = w.addStack();
-  nums.centerAlignContent();
-  pair(nums, "습관", `${hb.done}/${hb.total}`, SKY);
-  nums.addSpacer(small ? 10 : 14);
-  pair(nums, "할 일", `${td.done}/${td.total}`, PINK);
+  /* 첫 줄 — 숫자만 (제목 없음) */
+  const top = w.addStack();
+  top.centerAlignContent();
+  num(top, "습관", `${hb.done}/${hb.total}`, SKY);
+  top.addSpacer(11);
+  num(top, "할 일", `${td.done}/${td.total}`, PINK);
   if (!small) {
-    nums.addSpacer();
-    const box = nums.addStack();
-    box.layoutVertically();
-    const a = box.addText(`지출 ${short(mn.spent)}`);
-    a.font = Font.mediumSystemFont(11); a.textColor = MUTED; a.rightAlignText();
-    if (mn.budget) {
-      const b = box.addText(`남은 ${short(mn.left)}`);
-      b.font = Font.boldSystemFont(12.5);
-      b.textColor = mn.left < 0 ? PINK : GREEN;
-      b.rightAlignText();
-    }
+    top.addSpacer();
+    const money = w2 => {
+      const s = top.addText(w2);
+      s.font = Font.mediumSystemFont(10.5);
+      s.textColor = mn.budget && mn.left < 0 ? PINK : GREEN;
+      s.lineLimit = 1;
+      s.minimumScaleFactor = 0.8;
+    };
+    money(mn.budget ? `남은 ${short(mn.left)}` : `지출 ${short(mn.spent)}`);
   }
-  w.addSpacer(6);
+  w.addSpacer(5);
 
   /* 진행 막대 */
-  const barW = small ? 122 : 302;
+  const barW = small ? 124 : 300;
   const bar = w.addStack();
-  bar.size = new Size(barW, 5);
-  bar.cornerRadius = 3;
+  bar.size = new Size(barW, 4);
+  bar.cornerRadius = 2;
   bar.backgroundColor = LINE;
   if (pct > 0) {
-    const fill = bar.addStack();
-    fill.size = new Size(Math.max(4, Math.round(barW * pct)), 5);
-    fill.cornerRadius = 3;
-    fill.backgroundColor = SKY;
+    const f = bar.addStack();
+    f.size = new Size(Math.max(3, Math.round(barW * pct)), 4);
+    f.cornerRadius = 2;
+    f.backgroundColor = SKY;
   }
-  w.addSpacer(9);
+  w.addSpacer(7);
 
-  /* 목록 (+ 큰 위젯이면 오른쪽에 달력) */
+  /* 오늘 목록 (일정 + 할 일) */
   const rows = [];
-  (data.events || []).forEach(e => rows.push({ c: e.c ? new Color(e.c) : SKY, k: e.t, t: e.n }));
+  (data.events || []).forEach(e =>
+    rows.push({ c: e.c ? new Color(e.c) : SKY, k: e.t, t: e.n }));
   if (td.all && td.all.length) {
     td.all.forEach(x => rows.push({
-      c: x.d ? FAINT : PINK,
-      k: x.d ? "✓" : "○",
-      t: x.t,
-      dim: x.d
-    }));
+      c: x.d ? FAINT : PINK, k: x.d ? "✓" : "○", t: x.t, dim: x.d }));
   } else {
     (td.list || []).forEach(x => rows.push({ c: PINK, k: "○", t: x }));
   }
-
-  /* 끝낸 할 일은 항상 뒤로 — 자리가 모자라면 이것부터 잘린다 */
   rows.sort((a, b) => (a.dim ? 1 : 0) - (b.dim ? 1 : 0));
 
-  if (large) {
-    const box = w.addStack();
-    box.layoutVertically();
-    listInto(box, rows, 4, 12);
-    w.addSpacer(10);
-
-    const cap = w.addStack();
-    const cl = cap.addText("이번 주");
-    cl.font = Font.boldSystemFont(11);
-    cl.textColor = MUTED;
-    w.addSpacer(5);
-
-    (data.week || []).slice(1, 6).forEach((dy, i) => {
-      if (i) w.addSpacer(5);
-      const row = w.addStack();
-      row.topAlignContent();
-
-      const dcol = row.addStack();
-      dcol.layoutVertically();
-      dcol.size = new Size(34, 0);
-      const dd = dcol.addText(`${dy.day}일`);
-      dd.font = Font.boldSystemFont(11);
-      dd.textColor = (dy.dow === "토" || dy.dow === "일") ? PINK : INK;
-      const dw = dcol.addText(dy.dow);
-      dw.font = Font.systemFont(8.5);
-      dw.textColor = FAINT;
-
-      const icol = row.addStack();
-      icol.layoutVertically();
-      if (!dy.items.length) {
-        const e = icol.addText("—");
-        e.font = Font.systemFont(10.5);
-        e.textColor = FAINT;
-      } else {
-        dy.items.forEach((it, k) => {
-          if (k) icol.addSpacer(2);
-          const s2 = icol.addStack();
-          s2.centerAlignContent();
-          const kk = s2.addText(it.k);
-          kk.font = Font.mediumSystemFont(9);
-          kk.textColor = it.k === "○" ? PINK
-            : (it.c ? new Color(it.c) : (it.k === "D" ? GOLD : SKY));
-          s2.addSpacer(5);
-          const tt = s2.addText(it.t);
-          tt.font = Font.systemFont(10.5);
-          tt.textColor = INK;
-          tt.lineLimit = 1;
-        });
-        if (dy.more) {
-          const m = icol.addText(`+${dy.more}`);
-          m.font = Font.systemFont(9);
-          m.textColor = FAINT;
-        }
-      }
-    });
-  } else if (small) {
-    const box = w.addStack();
-    box.layoutVertically();
-    listInto(box, rows, 3, 11);
+  if (small) {
+    const box = w.addStack(); box.layoutVertically();
+    listInto(box, rows, 5, 10.5);
+  } else if (!large) {
+    twoCols(w, rows, 10, 10.5, 143);
   } else {
-    /* 중간 크기: 좌우 두 칸으로 나눠 8개까지 */
+    twoCols(w, rows, 8, 11, 148);
+    w.addSpacer(8);
+
+    /* 이번 주 일정 — 월~일 두 칸으로 */
+    const wk = data.week || [];
     const cols = w.addStack();
     cols.layoutHorizontally();
     cols.topAlignContent();
-    const L = cols.addStack(); L.layoutVertically(); L.size = new Size(146, 0);
-    cols.addSpacer(8);
-    const R = cols.addStack(); R.layoutVertically(); R.size = new Size(146, 0);
-    const half = rows.slice(0, 8);
-    listInto(L, half.slice(0, 4), 4, 11);
-    if (half.length > 4) listInto(R, half.slice(4), 4, 11, true);
-    if (rows.length > 8) {
-      const hid = rows.slice(8);
-      const left = hid.filter(x => !x.dim).length;
-      R.addSpacer(3);
-      const m = R.addText(left ? `+${left}개 남음` : `+${hid.length}개 더`);
-      m.font = Font.systemFont(9.5);
-      m.textColor = left ? PINK : MUTED;
-    }
+    const L = cols.addStack(); L.layoutVertically(); L.size = new Size(148, 0);
+    cols.addSpacer(6);
+    const R = cols.addStack(); R.layoutVertically(); R.size = new Size(148, 0);
+    wk.slice(0, 4).forEach((d, i) => dayRow(L, d, i));
+    wk.slice(4).forEach((d, i) => dayRow(R, d, i));
   }
 
   w.addSpacer();
-  const foot = w.addText(hhmm());
-  foot.font = Font.systemFont(8.5);
-  foot.textColor = MUTED;
+  const foot = w.addText(stamp(data.at));
+  foot.font = Font.systemFont(8);
+  foot.textColor = FAINT;
   foot.rightAlignText();
 }
 
-w.refreshAfterDate = new Date(Date.now() + 10 * 60 * 1000);
+w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
 if (config.runsInWidget) Script.setWidget(w);
 else if (large) await w.presentLarge();
+else if (small) await w.presentSmall();
 else await w.presentMedium();
 Script.complete();
 
 /* ── 조각들 ── */
-function pair(stack, label, value, color) {
+function num(stack, label, value, color) {
   const s = stack.addStack();
   s.centerAlignContent();
   const l = s.addText(label);
-  l.font = Font.systemFont(10.5); l.textColor = MUTED;
-  s.addSpacer(4);
+  l.font = Font.systemFont(9.5); l.textColor = MUTED;
+  s.addSpacer(3);
   const v = s.addText(value);
-  v.font = Font.boldSystemFont(13); v.textColor = color;
+  v.font = Font.boldSystemFont(12.5); v.textColor = color;
+}
+
+function twoCols(box, rows, max, fs, cw) {
+  const cols = box.addStack();
+  cols.layoutHorizontally();
+  cols.topAlignContent();
+  const L = cols.addStack(); L.layoutVertically(); L.size = new Size(cw, 0);
+  cols.addSpacer(6);
+  const R = cols.addStack(); R.layoutVertically(); R.size = new Size(cw, 0);
+  const half = Math.ceil(max / 2);
+  listInto(L, rows.slice(0, half), half, fs);
+  listInto(R, rows.slice(half, max), half, fs, true);
+  if (rows.length > max) {
+    const hid = rows.slice(max);
+    const left = hid.filter(x => !x.dim).length;
+    R.addSpacer(3);
+    const m = R.addText(left ? `+${left}개 남음` : `+${hid.length}개 더`);
+    m.font = Font.systemFont(9);
+    m.textColor = left ? PINK : FAINT;
+  }
 }
 
 function listInto(box, rows, max, fs, quiet) {
   if (!rows.length) {
     if (quiet) return;
-    const t = box.addText("남은 일정과 할 일이 없어요");
-    t.font = Font.systemFont(11); t.textColor = MUTED; t.lineLimit = 2;
+    const t = box.addText("남은 것이 없어요");
+    t.font = Font.systemFont(10.5); t.textColor = FAINT; t.lineLimit = 1;
     return;
   }
   rows.slice(0, max).forEach((r, i) => {
-    if (i) box.addSpacer(4);
+    if (i) box.addSpacer(3);
     const s = box.addStack();
     s.centerAlignContent();
     const k = s.addText(r.k);
     k.font = Font.mediumSystemFont(fs - 1.5);
     k.textColor = r.c; k.lineLimit = 1;
-    s.addSpacer(5);
+    s.addSpacer(4);
     const t = s.addText(r.t);
     t.font = Font.systemFont(fs);
     t.textColor = r.dim ? FAINT : INK;
     t.lineLimit = 1;
   });
-  if (rows.length > max) {
-    const hid = rows.slice(max);
-    const left = hid.filter(x => !x.dim).length;
-    box.addSpacer(4);
-    const m = box.addText(left ? `+${left}개 남음` : `+${hid.length}개 더`);
-    m.font = Font.systemFont(10);
-    m.textColor = left ? PINK : MUTED;
+}
+
+function dayRow(box, dy, i) {
+  if (i) box.addSpacer(4);
+  const row = box.addStack();
+  row.topAlignContent();
+
+  const d = row.addStack();
+  d.layoutVertically();
+  d.size = new Size(26, 0);
+  const dd = d.addText(String(dy.day));
+  dd.font = dy.today ? Font.boldSystemFont(10.5) : Font.systemFont(10.5);
+  dd.textColor = dy.today ? SKY : ((dy.dow === "토" || dy.dow === "일") ? PINK : INK);
+  const dw = d.addText(dy.dow);
+  dw.font = Font.systemFont(8);
+  dw.textColor = FAINT;
+
+  const c = row.addStack();
+  c.layoutVertically();
+  if (!dy.items.length) {
+    const e = c.addText("—");
+    e.font = Font.systemFont(9.5); e.textColor = FAINT;
+    return;
+  }
+  dy.items.forEach((it, k) => {
+    if (k) c.addSpacer(1);
+    const t = c.addText(it.t);
+    t.font = Font.systemFont(9.5);
+    t.textColor = it.c ? new Color(it.c) : SKY;
+    t.lineLimit = 1;
+  });
+  if (dy.more) {
+    const m = c.addText(`+${dy.more}`);
+    m.font = Font.systemFont(8.5); m.textColor = FAINT;
   }
 }
 
@@ -263,8 +226,11 @@ function short(n) {
   if (n >= 1000) return neg + (Math.round(n / 100) / 10) + "천";
   return neg + n + "원";
 }
-function hhmm() {
-  const d = new Date();
+function stamp(at) {
   const p = x => String(x).padStart(2, "0");
-  return `${p(d.getHours())}:${p(d.getMinutes())} 기준`;
+  const now = new Date();
+  const cur = `${p(now.getHours())}:${p(now.getMinutes())}`;
+  if (!at) return `${cur} 확인`;
+  const d = new Date(at);
+  return `기록 ${p(d.getHours())}:${p(d.getMinutes())} · 확인 ${cur}`;
 }
