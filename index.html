@@ -575,7 +575,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v81';
+const APP_VER='v82';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -890,6 +890,7 @@ function save(){
       if(saveFailed){saveFailed=false;render()}
       pushAutoSync();
       syncAuto();
+      sumAuto();
     }catch(e){
       if(!saveFailed){saveFailed=true;toast('저장이 안 되고 있어요. 통계 탭에서 백업하세요.');render()}
     }
@@ -1479,12 +1480,20 @@ function widgetSummary(){
     })()
   };
 }
+let sumTimer=null, lastSumJSON='';
+function sumAuto(){
+  if(!S.sync.room||!S.push.url) return;
+  clearTimeout(sumTimer);
+  sumTimer=setTimeout(()=>pushSummary(),3000);
+}
 async function pushSummary(){
   if(!S.sync.room||!S.push.url) return;
   try{
+    const body=JSON.stringify(widgetSummary());
+    if(body===lastSumJSON) return;
     await fetch(S.push.url.replace(/\/$/,'')+'/summary?room='+encodeURIComponent(S.sync.room),
-      {method:'POST',headers:{'content-type':'application/json'},
-       body:JSON.stringify(widgetSummary())});
+      {method:'POST',headers:{'content-type':'application/json'},body});
+    lastSumJSON=body;
   }catch(e){}
 }
 async function syncUp(silent){
@@ -1526,7 +1535,7 @@ async function syncStart(){
     }
   }catch(e){}
 }
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden) syncStart(); });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ syncStart(); setTimeout(()=>pushSummary(),1500); } });
 
 /* ══════════ 폰 알림 (푸시) ══════════ */
 const PUSH_OK=('serviceWorker' in navigator)&&('PushManager' in window)&&(typeof Notification!=='undefined');
@@ -3119,6 +3128,13 @@ function fixSheet(id){
       <input id="f-ftime" type="time" value="${f?f.time||'09:00':'09:00'}"></div>
     ${notifySelect2(f?f.notify:'','알림','f-notify')}
     <p class="hint" style="margin:-6px 0 13px">그날이 되면 알려줍니다. 알림을 받고 가계부에 기록하면 편해요.</p>
+    ${f?`<div class="field"><label for="f-scope">바꾼 내용을 어디에 적용할까요</label>
+      <select id="f-scope">
+        <option value="on" selected>${+moneyMonth.slice(5)}월부터 계속</option>
+        <option value="one">${+moneyMonth.slice(5)}월만</option>
+      </select>
+      <p class="tip">「이 달만」을 고르면 다음 달부터는 원래 금액·날짜로 돌아갑니다.</p></div>`
+      :'<input id="f-scope" type="hidden" value="on">'}
     <div class="field"><label for="f-ffrom">시작하는 달 (비우면 모든 달)</label>
       <input id="f-ffrom" type="month" value="${f?f.from||'':moneyMonth}"></div>
     ${f?`<p class="hint" style="margin:0 0 8px">금액과 날짜는 <b>${+moneyMonth.slice(5)}월부터</b> 적용됩니다.
@@ -4030,9 +4046,16 @@ document.addEventListener('click',ev=>{
     S.fixed||=[];
     if(d.savefix){
       const f2=S.fixed.find(x=>x.id===d.savefix);
+      const oneOnly=($('#f-scope')||{}).value==='one';
+      const prevAmt=fixAmt(f2,moneyMonth), prevDay=fixDayOf(f2,moneyMonth);
       Object.assign(f2,o);
       f2.amt=f2.amt||{}; f2.amt[moneyMonth]=amt;
       f2.dayM=f2.dayM||{}; f2.dayM[moneyMonth]=dayV;
+      if(oneOnly){
+        const nx=(()=>{const[yy,mm]=moneyMonth.split('-').map(Number);
+          return mm===12?`${yy+1}-01`:`${yy}-${pad(mm+1)}`})();
+        f2.amt[nx]=prevAmt; f2.dayM[nx]=prevDay;
+      }
     } else {
       S.fixed.push({id:uid(),...o,amount:amt,day:dayV,to:'',
         amt:o.from?{[o.from]:amt}:{},dayM:o.from?{[o.from]:dayV}:{},skip:[],
