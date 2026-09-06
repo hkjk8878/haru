@@ -1,155 +1,216 @@
 // ─────────────────────────────────────────────
 //  하루 — 아이폰 홈 화면 위젯 (Scriptable 용)
 //
-//  쓰는 법
-//  1) 앱스토어에서 무료 앱 "Scriptable" 설치
-//  2) Scriptable 열기 → 오른쪽 위 ＋ → 이 파일 내용 전부 붙여넣기
-//  3) 아래 URL 줄을 하루 앱 설정 탭에서 복사한 주소로 바꾸기
-//  4) 이름을 "하루"로 저장
-//  5) 홈 화면 길게 누르기 → ＋ → Scriptable → 위젯 크기 고르기
-//     → 위젯 길게 누르기 → "위젯 편집" → Script: 하루
+//  1) URL 을 하루 앱 설정 탭 → 홈 화면 위젯 → 주소 복사하기 로 바꾸세요
+//  2) Scriptable 에 붙여넣고 "하루" 로 저장
+//  3) 홈 화면 → 위젯 추가 → Scriptable → 위젯 편집 → Script: 하루
+//
+//  큰 위젯은 오늘 목록 + 이번 주 5일치 일정을 함께 보여줍니다.
 // ─────────────────────────────────────────────
 
-const URL = "https://haru-alarm.hkjk8878.workers.dev/summary?room=여기에_동기화_코드";
+const URL  = "https://haru-alarm.hkjk8878.workers.dev/summary?room=여기에_동기화_코드";
+const OPEN = "https://hkjk8878.github.io/haru/";
 
-// 색
 const SKY   = new Color("#56B7F2");
 const PINK  = new Color("#F2789A");
 const GREEN = new Color("#34D399");
 const GOLD  = new Color("#E5B15E");
 const INK   = new Color("#E9EBF2");
 const MUTED = new Color("#8A90A0");
+const FAINT = new Color("#565C6B");
 const BG    = new Color("#181B22");
-const LINE  = new Color("#272B35");
+const LINE  = new Color("#2A2F3A");
 
 let data = null;
 try {
   const r = new Request(URL);
   r.timeoutInterval = 8;
   data = await r.loadJSON();
-} catch (e) {
-  data = null;
-}
+} catch (e) { data = null; }
+
+const size  = config.widgetFamily || "medium";
+const small = size === "small";
+const large = size === "large";
 
 const w = new ListWidget();
 w.backgroundColor = BG;
-w.setPadding(14, 14, 14, 14);
-w.url = "https://hkjk8878.github.io/haru/";
+w.setPadding(12, 13, 12, 13);
+w.url = OPEN;
 
 if (!data || data.error) {
   const t = w.addText("하루");
-  t.font = Font.boldSystemFont(15);
-  t.textColor = INK;
+  t.font = Font.boldSystemFont(15); t.textColor = INK;
   w.addSpacer(6);
   const e = w.addText(data && data.error ? data.error : "불러오지 못했어요");
-  e.font = Font.systemFont(11);
-  e.textColor = MUTED;
-  e.lineLimit = 3;
+  e.font = Font.systemFont(11); e.textColor = MUTED; e.lineLimit = 3;
 } else {
-  const size = config.widgetFamily || "medium";
   const hb = data.habit || { done: 0, total: 0 };
-  const td = data.todo || { done: 0, total: 0, list: [] };
+  const td = data.todo  || { done: 0, total: 0, list: [] };
   const mn = data.money || { spent: 0, budget: 0, left: 0 };
   const pct = hb.total ? hb.done / hb.total : 0;
 
-  // 머리줄
+  /* 윗줄 */
   const head = w.addStack();
   head.centerAlignContent();
-  const title = head.addText(data.off ? "오늘은 쉬는 날" : "오늘");
-  title.font = Font.boldSystemFont(14);
+  const title = head.addText(data.off ? "쉬는 날" : "오늘");
+  title.font = Font.boldSystemFont(13);
   title.textColor = data.off ? GOLD : INK;
   head.addSpacer();
-  if (data.next) {
-    const nx = head.addText(data.next.at + " " + data.next.label);
+  if (data.next && !small) {
+    const nx = head.addText(`${data.next.at}  ${data.next.label}`);
     nx.font = Font.systemFont(10);
-    nx.textColor = MUTED;
-    nx.lineLimit = 1;
-  }
-  w.addSpacer(9);
-
-  // 습관 진행 막대
-  const barW = size === "small" ? 126 : (size === "large" ? 300 : 300);
-  const bar = w.addStack();
-  bar.layoutHorizontally();
-  bar.size = new Size(barW, 8);
-  bar.cornerRadius = 4;
-  bar.backgroundColor = LINE;
-  if (pct > 0) {
-    const fill = bar.addStack();
-    fill.size = new Size(Math.max(6, Math.round(barW * pct)), 8);
-    fill.cornerRadius = 4;
-    fill.backgroundColor = SKY;
+    nx.textColor = MUTED; nx.lineLimit = 1;
   }
   w.addSpacer(7);
 
-  const line1 = w.addStack();
-  const l1 = line1.addText(`습관 ${hb.done}/${hb.total}`);
-  l1.font = Font.mediumSystemFont(12);
-  l1.textColor = SKY;
-  line1.addSpacer(10);
-  const l2 = line1.addText(`할 일 ${td.done}/${td.total}`);
-  l2.font = Font.mediumSystemFont(12);
-  l2.textColor = PINK;
-
-  if (size !== "small") {
-    line1.addSpacer(10);
-    const l3 = line1.addText(
-      mn.budget ? `남은 예산 ${short(mn.left)}` : `지출 ${short(mn.spent)}`
-    );
-    l3.font = Font.mediumSystemFont(12);
-    l3.textColor = mn.budget && mn.left < 0 ? PINK : GREEN;
+  /* 숫자 줄 */
+  const nums = w.addStack();
+  nums.centerAlignContent();
+  pair(nums, "습관", `${hb.done}/${hb.total}`, SKY);
+  nums.addSpacer(small ? 10 : 14);
+  pair(nums, "할 일", `${td.done}/${td.total}`, PINK);
+  if (!small) {
+    nums.addSpacer();
+    const box = nums.addStack();
+    box.layoutVertically();
+    const a = box.addText(`지출 ${short(mn.spent)}`);
+    a.font = Font.mediumSystemFont(11); a.textColor = MUTED; a.rightAlignText();
+    if (mn.budget) {
+      const b = box.addText(`남은 ${short(mn.left)}`);
+      b.font = Font.boldSystemFont(12.5);
+      b.textColor = mn.left < 0 ? PINK : GREEN;
+      b.rightAlignText();
+    }
   }
+  w.addSpacer(6);
 
-  // 남은 할 일 · 일정
+  /* 진행 막대 */
+  const barW = small ? 122 : 302;
+  const bar = w.addStack();
+  bar.size = new Size(barW, 5);
+  bar.cornerRadius = 3;
+  bar.backgroundColor = LINE;
+  if (pct > 0) {
+    const fill = bar.addStack();
+    fill.size = new Size(Math.max(4, Math.round(barW * pct)), 5);
+    fill.cornerRadius = 3;
+    fill.backgroundColor = SKY;
+  }
+  w.addSpacer(9);
+
+  /* 목록 (+ 큰 위젯이면 오른쪽에 달력) */
   const rows = [];
-  (data.events || []).forEach(e => rows.push({ c: SKY, t: `${e.t} ${e.n}` }));
-  (td.list || []).forEach(x => rows.push({ c: PINK, t: `○ ${x}` }));
-  const max = size === "large" ? 6 : (size === "medium" ? 3 : 2);
+  (data.events || []).forEach(e => rows.push({ c: SKY,  k: e.t, t: e.n }));
+  (td.list || []).forEach(x     => rows.push({ c: PINK, k: "○",  t: x }));
 
-  if (rows.length) {
-    w.addSpacer(9);
-    rows.slice(0, max).forEach(r => {
-      const s = w.addStack();
-      const dot = s.addText("•");
-      dot.font = Font.systemFont(11);
-      dot.textColor = r.c;
-      s.addSpacer(5);
-      const tx = s.addText(r.t);
-      tx.font = Font.systemFont(11);
-      tx.textColor = INK;
-      tx.lineLimit = 1;
-      w.addSpacer(3);
+  if (large) {
+    const box = w.addStack();
+    box.layoutVertically();
+    listInto(box, rows, 4, 12);
+    w.addSpacer(10);
+
+    const cap = w.addStack();
+    const cl = cap.addText("이번 주");
+    cl.font = Font.boldSystemFont(11);
+    cl.textColor = MUTED;
+    w.addSpacer(5);
+
+    (data.week || []).slice(1, 6).forEach((dy, i) => {
+      if (i) w.addSpacer(5);
+      const row = w.addStack();
+      row.topAlignContent();
+
+      const dcol = row.addStack();
+      dcol.layoutVertically();
+      dcol.size = new Size(34, 0);
+      const dd = dcol.addText(`${dy.day}일`);
+      dd.font = Font.boldSystemFont(11);
+      dd.textColor = (dy.dow === "토" || dy.dow === "일") ? PINK : INK;
+      const dw = dcol.addText(dy.dow);
+      dw.font = Font.systemFont(8.5);
+      dw.textColor = FAINT;
+
+      const icol = row.addStack();
+      icol.layoutVertically();
+      if (!dy.items.length) {
+        const e = icol.addText("—");
+        e.font = Font.systemFont(10.5);
+        e.textColor = FAINT;
+      } else {
+        dy.items.forEach((it, k) => {
+          if (k) icol.addSpacer(2);
+          const s2 = icol.addStack();
+          s2.centerAlignContent();
+          const kk = s2.addText(it.k);
+          kk.font = Font.mediumSystemFont(9);
+          kk.textColor = it.k === "○" ? PINK : (it.k === "D" ? GOLD : SKY);
+          s2.addSpacer(5);
+          const tt = s2.addText(it.t);
+          tt.font = Font.systemFont(10.5);
+          tt.textColor = INK;
+          tt.lineLimit = 1;
+        });
+        if (dy.more) {
+          const m = icol.addText(`+${dy.more}`);
+          m.font = Font.systemFont(9);
+          m.textColor = FAINT;
+        }
+      }
     });
   } else {
-    w.addSpacer(9);
-    const done = w.addText(hb.total && hb.done >= hb.total ? "오늘 할 것 다 했어요" : "남은 게 없어요");
-    done.font = Font.systemFont(11);
-    done.textColor = MUTED;
-  }
-
-  // 연속 기록 (큰 위젯만)
-  if (size === "large" && (data.streaks || []).length) {
-    w.addSpacer(8);
-    const st = w.addStack();
-    data.streaks.forEach((x, i) => {
-      if (i) st.addSpacer(8);
-      const s = st.addText(`🔥 ${x.n} ${x.d}일`);
-      s.font = Font.systemFont(11);
-      s.textColor = GOLD;
-    });
+    const box = w.addStack();
+    box.layoutVertically();
+    listInto(box, rows, small ? 3 : 4, small ? 11 : 12);
   }
 
   w.addSpacer();
   const foot = w.addText(hhmm());
-  foot.font = Font.systemFont(9);
+  foot.font = Font.systemFont(8.5);
   foot.textColor = MUTED;
   foot.rightAlignText();
 }
 
 w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
 if (config.runsInWidget) Script.setWidget(w);
+else if (large) await w.presentLarge();
 else await w.presentMedium();
 Script.complete();
+
+/* ── 조각들 ── */
+function pair(stack, label, value, color) {
+  const s = stack.addStack();
+  s.centerAlignContent();
+  const l = s.addText(label);
+  l.font = Font.systemFont(10.5); l.textColor = MUTED;
+  s.addSpacer(4);
+  const v = s.addText(value);
+  v.font = Font.boldSystemFont(13); v.textColor = color;
+}
+
+function listInto(box, rows, max, fs) {
+  if (!rows.length) {
+    const t = box.addText("남은 일정과 할 일이 없어요");
+    t.font = Font.systemFont(11); t.textColor = MUTED; t.lineLimit = 2;
+    return;
+  }
+  rows.slice(0, max).forEach((r, i) => {
+    if (i) box.addSpacer(4);
+    const s = box.addStack();
+    s.centerAlignContent();
+    const k = s.addText(r.k);
+    k.font = Font.mediumSystemFont(fs - 1.5);
+    k.textColor = r.c; k.lineLimit = 1;
+    s.addSpacer(5);
+    const t = s.addText(r.t);
+    t.font = Font.systemFont(fs);
+    t.textColor = INK; t.lineLimit = 1;
+  });
+  if (rows.length > max) {
+    box.addSpacer(4);
+    const m = box.addText(`+${rows.length - max}개 더`);
+    m.font = Font.systemFont(10); m.textColor = MUTED;
+  }
+}
 
 function short(n) {
   n = Math.round(n || 0);
@@ -157,7 +218,7 @@ function short(n) {
   n = Math.abs(n);
   if (n >= 10000) return neg + (Math.round(n / 1000) / 10) + "만";
   if (n >= 1000) return neg + (Math.round(n / 100) / 10) + "천";
-  return neg + n;
+  return neg + n + "원";
 }
 function hhmm() {
   const d = new Date();
