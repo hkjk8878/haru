@@ -107,7 +107,19 @@ if (!data || data.error) {
   /* 목록 (+ 큰 위젯이면 오른쪽에 달력) */
   const rows = [];
   (data.events || []).forEach(e => rows.push({ c: e.c ? new Color(e.c) : SKY, k: e.t, t: e.n }));
-  (td.list || []).forEach(x     => rows.push({ c: PINK, k: "○",  t: x }));
+  if (td.all && td.all.length) {
+    td.all.forEach(x => rows.push({
+      c: x.d ? FAINT : PINK,
+      k: x.d ? "✓" : "○",
+      t: x.t,
+      dim: x.d
+    }));
+  } else {
+    (td.list || []).forEach(x => rows.push({ c: PINK, k: "○", t: x }));
+  }
+
+  /* 끝낸 할 일은 항상 뒤로 — 자리가 모자라면 이것부터 잘린다 */
+  rows.sort((a, b) => (a.dim ? 1 : 0) - (b.dim ? 1 : 0));
 
   if (large) {
     const box = w.addStack();
@@ -180,9 +192,12 @@ if (!data || data.error) {
     listInto(L, half.slice(0, 4), 4, 11);
     if (half.length > 4) listInto(R, half.slice(4), 4, 11, true);
     if (rows.length > 8) {
+      const hid = rows.slice(8);
+      const left = hid.filter(x => !x.dim).length;
       R.addSpacer(3);
-      const m = R.addText(`+${rows.length - 8}개 더`);
-      m.font = Font.systemFont(9.5); m.textColor = MUTED;
+      const m = R.addText(left ? `+${left}개 남음` : `+${hid.length}개 더`);
+      m.font = Font.systemFont(9.5);
+      m.textColor = left ? PINK : MUTED;
     }
   }
 
@@ -227,12 +242,16 @@ function listInto(box, rows, max, fs, quiet) {
     s.addSpacer(5);
     const t = s.addText(r.t);
     t.font = Font.systemFont(fs);
-    t.textColor = INK; t.lineLimit = 1;
+    t.textColor = r.dim ? FAINT : INK;
+    t.lineLimit = 1;
   });
   if (rows.length > max) {
+    const hid = rows.slice(max);
+    const left = hid.filter(x => !x.dim).length;
     box.addSpacer(4);
-    const m = box.addText(`+${rows.length - max}개 더`);
-    m.font = Font.systemFont(10); m.textColor = MUTED;
+    const m = box.addText(left ? `+${left}개 남음` : `+${hid.length}개 더`);
+    m.font = Font.systemFont(10);
+    m.textColor = left ? PINK : MUTED;
   }
 }
 
