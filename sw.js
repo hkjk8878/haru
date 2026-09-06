@@ -1,7 +1,7 @@
 /* 하루 — 서비스워커
    앱 파일을 캐시해 두어 인터넷이 없어도 열리게 합니다.
    index.html을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요. */
-const VERSION = 'haru-v64';
+const VERSION = 'haru-v95';
 const FILES = [
   './',
   './index.html',
@@ -33,6 +33,8 @@ self.addEventListener('activate', e => {
 /* 화면 파일은 네트워크를 먼저 시도하고, 실패하면 캐시에서 꺼냅니다.
    덕분에 배포로 새 버전을 올리면 다음 접속에 바로 반영됩니다. */
 self.addEventListener('fetch', e => {
+  /* 다른 도메인(글꼴 CDN 등)은 서비스워커가 건드리지 않는다 */
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   const req = e.request;
   if (req.method !== 'GET') return;
 

@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#0F1116">
 <meta name="description" content="루틴·할 일·일정·목표·가계부를 한 화면에서 관리하는 개인 기록 앱">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/quiple/galmuri/dist/galmuri.css">
 <link rel="apple-touch-icon" href="apple-touch-icon-v24.png">
 <link rel="icon" href="icon-192-v24.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -565,6 +566,138 @@ nav button.on{color:var(--ink)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .loading{padding:70px 16px;text-align:center;color:var(--muted);font-size:14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ══════════ 픽셀 테마 ══════════ */
+body.pixel{
+  font-family:'Galmuri11','Galmuri9',-apple-system,sans-serif;
+  letter-spacing:0;
+}
+body.pixel *{border-radius:0 !important;letter-spacing:0 !important}
+body.pixel img,body.pixel canvas{image-rendering:pixelated}
+body.pixel h1,body.pixel h2,body.pixel b,body.pixel strong{font-weight:400}
+
+/* ── 배색 1. 나이트 (어두운 보라 바탕 + 노란 계열 포인트) ── */
+body.px-night{
+  --paper:#17142A; --card:#332B52; --card2:#3E3562;
+  --ink:#F2E9D2; --muted:#B7ADD6; --line:#564B85;
+  --cell:#2C2547; --cell2:#3A3159; --onAccent:#17142A;
+  --plan:#D8B26A; --plan-soft:#3B3020;
+  --task:#E8934A; --task-soft:#43301C;
+  --habit:#F5C542; --habit-soft:#453718;
+  --goal:#F0DC8A; --goal-soft:#3E3722;
+  --h0:#2C2547; --h1:#453718; --h2:#7A6026; --h3:#B99534; --h4:#F5C542;
+  --pxB:#F2E9D2; --pxHi:rgba(255,255,255,.12); --pxBtn:#3E3562;
+  --pxNav:#221D3B; --pxNavHi:#413769; --pxNavInk:#F2E9D2;
+  --pxSel:#F5C542; --pxSelInk:#17142A;
+}
+/* ── 배색 2. 갈색 ── */
+body.px-book{
+  --paper:#D9BE92; --card:#F7EBD3; --card2:#EADCBB;
+  --ink:#43382A; --muted:#6B5B45; --line:#B99A6E;
+  --cell:#EFE0C0; --cell2:#DFCCA4; --onAccent:#FBF3E2;
+  --plan:#3B6E8C; --plan-soft:#D3E4EE;
+  --task:#B4402C; --task-soft:#F3D7CE;
+  --habit:#3F7A31; --habit-soft:#D9E9C6;
+  --goal:#96690F; --goal-soft:#F3E3BC;
+  --h0:#E2CDA5; --h1:#D6E7BE; --h2:#A9CE90; --h3:#6FA55A; --h4:#3F7A31;
+  --pxB:#3A2A22; --pxHi:rgba(255,255,255,.55); --pxBtn:#EFE0C0;
+  --pxNav:#3A2A22; --pxNavHi:#5A4234; --pxNavInk:#F7EBD3;
+  --pxSel:#3F7A31; --pxSelInk:#FBF3E2;
+}
+/* 바탕(카드 밖) 위 글씨는 한 톤 더 진하게 */
+body.px-book .top h1,body.px-book .sechead h2{color:#3A2E20}
+body.px-book .sub,body.px-book .sechead button{color:#5C4C36}
+body.px-night .sub,body.px-night .sechead button{color:#CFC6E8}
+
+/* ── 공통 모양 ── */
+body.pixel .card,body.pixel .grp{
+  background:var(--card);
+  border:3px solid var(--pxB);
+  box-shadow:inset 0 0 0 2px var(--pxHi), 0 4px 0 var(--pxB);
+  margin-bottom:18px;
+}
+body.pixel .grp.full{background:linear-gradient(180deg,var(--habit-soft),var(--card) 60%)}
+
+body.pixel .pill,body.pixel .addbtn,body.pixel .save,body.pixel .cancel,
+body.pixel .del,body.pixel .allbtn,body.pixel .catchip,body.pixel .quick button,
+body.pixel .picks button,body.pixel .dayspick button,body.pixel .seg button,
+body.pixel .mvs button,body.pixel .fadd,body.pixel .rest,body.pixel .vv,
+body.pixel .at,body.pixel .cnt,body.pixel .mact,body.pixel .medit,body.pixel .svtog{
+  border:2px solid var(--pxB);
+  box-shadow:inset 0 2px 0 var(--pxHi), 0 2px 0 var(--pxB);
+  background:var(--pxBtn);
+  color:var(--ink);
+}
+body.pixel .pill:active,body.pixel .addbtn:active,body.pixel .save:active,
+body.pixel .catchip:active,body.pixel .seg button:active{
+  box-shadow:inset 0 2px 0 rgba(0,0,0,.12);
+  transform:translateY(2px);
+}
+body.pixel .seg button.on,body.pixel .catchip.on,body.pixel .picks button.on,
+body.pixel .dayspick button.on{
+  background:var(--pxSel);color:var(--pxSelInk);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.25), 0 2px 0 var(--pxB);
+}
+body.pixel .save,body.pixel .pill.h{background:var(--habit);color:var(--onAccent)}
+body.pixel .pill.g{background:var(--goal);color:var(--onAccent)}
+body.pixel .del{background:var(--task);color:#FFF3F0}
+
+body.pixel .top h1{font-size:21px}
+body.pixel .sub,body.pixel .hint,body.pixel .tip,body.pixel .empty{color:var(--muted)}
+
+body.pixel nav{
+  background:var(--pxNav);
+  border-top:3px solid var(--pxB);
+  box-shadow:inset 0 3px 0 var(--pxNavHi);
+}
+body.pixel nav button{color:var(--pxNavInk);opacity:.62}
+body.pixel nav button.on{opacity:1;color:var(--pxNavInk)}
+body.pixel nav button i{color:var(--pxNavInk)}
+body.pixel nav button.on i{background:var(--pxSel);color:var(--pxSelInk)}
+body.pixel .sechead h2{color:var(--ink)}
+body.pixel .sechead button{color:var(--muted)}
+
+body.pixel .hb .tick,body.pixel .todo .box,body.pixel .step .box,body.pixel .lrow .lc{
+  border:2px solid var(--pxB);
+  background:var(--card);
+  box-shadow:inset 0 2px 0 var(--pxHi);
+}
+body.pixel .hb.done .tick{background:var(--habit);color:var(--onAccent)}
+body.pixel .todo.done .box{background:var(--task);color:#FFF3F0}
+body.pixel .step.done .box{background:var(--goal);color:var(--onAccent)}
+
+body.pixel .bar,body.pixel .gth .pbar{
+  background:var(--cell2);border:2px solid var(--pxB);height:12px;
+}
+body.pixel .bar i,body.pixel .gth .pbar i{box-shadow:inset 0 2px 0 rgba(255,255,255,.3)}
+
+body.pixel .dc{
+  background:var(--cell);border:2px solid var(--line);
+  box-shadow:inset 0 2px 0 var(--pxHi);
+}
+body.pixel .dc.dim{background:transparent;border-color:transparent}
+body.pixel .dc.sel{border-color:var(--pxSel);background:var(--habit-soft)}
+body.pixel .dc>b{font-size:12px}
+body.pixel .dc .evs i{background:transparent}
+
+body.pixel .field input,body.pixel .field select,body.pixel .field textarea,
+body.pixel .vrow input,body.pixel .vrow select,body.pixel .xt3 input,body.pixel .xt3 select,
+body.pixel .addtodo input,body.pixel .note{
+  background:var(--card);border:2px solid var(--pxB);color:var(--ink);
+  box-shadow:inset 0 2px 0 rgba(0,0,0,.05);
+}
+body.pixel .field label{color:var(--muted)}
+
+body.pixel .sheet{
+  background:var(--card);
+  border:3px solid var(--pxB);
+  box-shadow:inset 0 0 0 2px var(--pxHi), 0 -4px 0 var(--pxB);
+}
+body.pixel .sheet h2{font-size:17px}
+body.pixel .gauge{background:var(--card2);border:2px solid var(--line)}
+body.pixel .toast{background:var(--pxB);color:var(--card);border:2px solid var(--pxB)}
+body.pixel .sec,body.pixel .sec2{border:2px solid var(--line)}
+body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 </style>
 </head>
 <body>
@@ -578,7 +711,7 @@ nav button.on{color:var(--ink)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v88';
+const APP_VER='v95';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -704,7 +837,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:33,
+    version:36,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -781,6 +914,12 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<36){
+    if(['pixel','px-wood','px-lav','px-mint'].indexOf(d.theme)>=0) d.theme='px-book';
+    d.version=36;
+  }
+  if(d.version<35){ if(d.theme==='pixel') d.theme='px-wood'; d.version=35; }
+  if(d.version<34){ d.theme=d.theme||'dark'; d.version=34; }
   if(d.version<33){ (d.calViews||[]).forEach((v,i)=>{v.ord=(v.ord===undefined?i:v.ord)}); d.version=33; }
   if(d.version<32){ (d.fixed||[]).forEach(f=>{f.dayM=f.dayM||{}}); d.version=32; }
   if(d.version<31){ (d.habits||[]).forEach(h=>{h.always=!!h.always}); d.version=31; }
@@ -846,7 +985,7 @@ function migrate(d){
   d.push||={url:'',id:'',on:false,at:'',err:''};
   d.sync||={room:'',on:false,rev:0,at:''};
   d.lines||=[]; d.lineMode||='both'; d.modes||=[]; d.calViews||=[];
-  d.budgets||={}; d.catBud||={};
+  d.budgets||={}; d.catBud||={}; d.theme||='dark';
   if(typeof d.activeModeId!=='string') d.activeModeId='';
   if(d.modeOverride===undefined) d.modeOverride=null; d.collapsed||={}; d.homeView||='card';
   return d;
@@ -1735,7 +1874,18 @@ async function pushOff(){
 }
 
 /* ══════════ 렌더 ══════════ */
+const THEMES=[['dark','기본 (어두운 화면)','#0F1116'],
+  ['px-night','픽셀 · 보라','#17142A'],
+  ['px-book','픽셀 · 갈색','#D9BE92']];
+function applyTheme(){
+  const t=S.theme||'dark';
+  document.body.className=t==='dark'?'':('pixel '+t);
+  const mt=document.querySelector('meta[name=theme-color]');
+  const f=THEMES.find(x=>x[0]===t)||THEMES[0];
+  if(mt) mt.setAttribute('content',f[2]);
+}
 function render(){
+  applyTheme();
   $('#app').innerHTML= tab==='today'?vToday():tab==='routine'?vRoutine()
     :tab==='cal'?vCal():tab==='money'?vMoney():tab==='set'?vSet():vStat();
   $('#nav').innerHTML=`<div class="inner">${[
@@ -2645,7 +2795,13 @@ function vSet(){
   return `<div class="top"><div class="datenav"><div><h1>설정</h1>
     <p class="sub" style="display:block">알림, 동기화, 백업을 한자리에서.</p></div></div></div>`+
     notifyCard()+syncCard()+backupCard()+linesCard()+installCard()+
-    `<div class="card"><header><h2>홈 화면 위젯</h2>
+    `<div class="card"><header><h2>화면 테마</h2>
+      <span class="count">${(THEMES.find(x=>x[0]===(S.theme||'dark'))||THEMES[0])[1]}</span></header>
+      <div class="picks" style="padding:4px 16px 14px">
+        ${THEMES.map(([k,l])=>`<button type="button" data-theme="${k}" class="${(S.theme||'dark')===k?'on':''}">${l}</button>`).join('')}
+      </div>
+    </div>
+    <div class="card"><header><h2>홈 화면 위젯</h2>
       <span class="count">Scriptable</span></header>
       <div class="empty" style="padding-bottom:8px">아이폰 홈 화면에 오늘 진행률을 띄울 수 있어요.
         무료 앱 <b>Scriptable</b>이 필요합니다. 아래를 눌러 주소를 확인하세요.</div>
@@ -3607,7 +3763,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -4031,6 +4187,12 @@ document.addEventListener('click',ev=>{
     save();closeSheet();render();toast('보기 묶음을 저장했어요');
     return;
   }
+  if(d.theme){
+    S.theme=d.theme;
+    save();render();
+    toast('테마를 바꿨어요');
+    return;
+  }
   if(d.cvmove){
     const [vid,dir]=d.cvmove.split(':');
     const list=(S.calViews||[]).slice().sort((a,b)=>((a.ord||0)-(b.ord||0)));
@@ -4361,7 +4523,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:33,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:36,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
