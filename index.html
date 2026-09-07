@@ -495,11 +495,19 @@ nav button.on{color:var(--ink)}
 .sheet .hint{margin:0 0 14px;font-size:12.5px;color:var(--muted)}
 .field{margin-bottom:13px}
 .field label{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
+.tf{position:relative;display:block}
+.tf input{padding-right:34px !important}
+.tfx{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:24px;height:24px;
+  border-radius:8px;background:var(--cell2);color:var(--muted);font-size:11px;line-height:1;
+  display:grid;place-items:center}
+body.pixel .tfx{border:2px solid var(--pxB);box-shadow:none;border-radius:0}
 .field input,.field select,.field textarea{width:100%;border:1.5px solid var(--line);background:var(--card2);
   border-radius:12px;padding:11px 12px;font-size:15px}
 .field textarea{min-height:64px;resize:vertical}
 .field input.amt{font-size:24px;font-weight:750;letter-spacing:-.02em;padding:12px}
-.row2{display:flex;gap:10px}
+.row2{display:flex;gap:10px;align-items:flex-start}
+.row2>.field{min-width:0}
+.row2 .field label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row2 .field{flex:1}
 .vrow{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px;align-items:start;
   margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
@@ -738,7 +746,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v104';
+const APP_VER='v105';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -3085,7 +3093,24 @@ function habitStatRows(){
 function openSheet(h){
   sheetPick.catEdit=false; sheetPick.catEditId='';
   $('#sheet').innerHTML=h; $('#scrim').classList.add('open');
+  addTimeClears();
   requestAnimationFrame(()=>$('#sheet').classList.add('open'));
+}
+/* 시각 칸마다 지우기 단추를 붙인다 (한 번 정하면 못 비우던 문제) */
+function addTimeClears(){
+  $('#sheet').querySelectorAll('input[type="time"]').forEach(inp=>{
+    if(inp.dataset.tf) return;
+    inp.dataset.tf='1';
+    const wrap=document.createElement('span');
+    wrap.className='tf';
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    const b=document.createElement('button');
+    b.type='button'; b.className='tfx'; b.textContent='✕';
+    b.setAttribute('aria-label','시각 지우기');
+    b.setAttribute('data-cleartf','1');
+    wrap.appendChild(b);
+  });
 }
 function closeSheet(){$('#sheet').classList.remove('open');$('#scrim').classList.remove('open')}
 function daysPicker(){
@@ -3411,7 +3436,7 @@ function grpSheet(id){
     <p class="hint">예: 눈 뜨자마자, 출근 전, 자기 전</p><p class="err" id="err"></p>
     <div class="field"><label for="f-name">묶음 이름</label>
       <input id="f-name" type="text" value="${g?esc(g.name):''}" placeholder="눈 뜨자마자" maxlength="20"></div>
-    <div class="row2"><div class="field"><label for="f-time">시각 (비워도 됨)</label>
+    <div class="row2"><div class="field"><label for="f-time">시각</label>
         <input id="f-time" type="time" value="${g?g.time||'':''}"></div>
       <div class="field"><label for="f-min">소요 (분)</label>
         <input id="f-min" type="number" min="0" step="5" value="${g&&g.min?g.min:''}" placeholder="15"></div></div>
@@ -3798,7 +3823,7 @@ function todoSheet(id){
       <input id="f-ttitle" type="text" value="${esc(t.title)}" maxlength="80"></div>
     <div class="row2"><div class="field"><label for="f-tdate">날짜</label>
         <input id="f-tdate" type="date" value="${t.date}"></div>
-      <div class="field"><label for="f-ttime">시각 (비워도 됨)</label>
+      <div class="field"><label for="f-ttime">시각</label>
         <input id="f-ttime" type="time" value="${t.time||''}"></div></div>
     ${notifySelect(t.notify||'','알림')}
     <div class="actions"><button class="del" data-deltodo="${t.id}">삭제</button>
@@ -3819,7 +3844,7 @@ function budgetSheet(){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-cleartf],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -4243,6 +4268,11 @@ document.addEventListener('click',ev=>{
       S.calViews.push({id:id2,...o,ord:S.calViews.length});
       calFilter='v:'+id2; }
     save();closeSheet();render();toast('보기 묶음을 저장했어요');
+    return;
+  }
+  if(d.cleartf){
+    const inp=el.parentNode&&el.parentNode.querySelector('input[type="time"]');
+    if(inp){ inp.value=''; inp.dispatchEvent(new Event('change',{bubbles:true})); }
     return;
   }
   if(d.theme){
