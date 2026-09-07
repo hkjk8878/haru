@@ -389,23 +389,27 @@ body.pixel .addtodo button{font-size:12px;padding:10px 12px}
 .calnav button{width:30px;height:30px;border-radius:10px;background:var(--card2);
   display:grid;place-items:center;color:var(--muted);flex:none}
 .calnav .r{margin-left:auto}
-.cal{padding:2px 12px 14px}
-.cal .hd{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
-.cal .hd span{text-align:center;font-size:10.5px;color:var(--muted)}
-.cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2.5px}
-.cal{padding-left:9px;padding-right:9px}
-.dc{min-height:74px;border-radius:9px;background:var(--card2);display:flex;flex-direction:column;
-  align-items:stretch;padding:4px 3px 4px;gap:2px;font-size:11px;color:var(--ink);overflow:hidden}
-.dc>b{font-size:11.5px;font-weight:650;text-align:center;line-height:1.2;flex:none}
-.dc.dim{background:transparent;color:var(--muted)}
-.dc.sel{box-shadow:inset 0 0 0 2px var(--habit);background:var(--habit-soft)}
-.dc.tod>b{color:var(--habit);font-weight:800}
+.cal{padding:2px 4px 10px}
+.cal .hd{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px}
+.cal .hd span{text-align:center;font-size:10.5px;color:var(--muted);font-weight:650}
+.cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0}
+.dc{min-height:92px;background:transparent;display:flex;flex-direction:column;align-items:stretch;
+  padding:4px 2px 5px;gap:3px;font-size:11px;color:var(--ink);overflow:hidden;
+  border-top:1px solid var(--line);border-radius:0}
+.dc>b{flex:none;align-self:center;display:grid;place-items:center;
+  width:23px;height:23px;border-radius:50%;font-size:13px;font-weight:700;line-height:1}
+.dc.dim{color:var(--muted);opacity:.55}
+.dc.sel>b{box-shadow:inset 0 0 0 2px var(--habit)}
+.dc.tod>b{background:var(--habit);color:var(--onAccent);font-weight:800}
+.dc.tod.sel>b{box-shadow:none}
 .dc .evs{flex:1;display:flex;flex-direction:column;gap:1.5px;min-height:0;overflow:hidden}
-.dc .evs i{font-style:normal;font-size:8.5px;line-height:1.25;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;text-align:left;padding:1px 3px;border-radius:3px;background:rgba(255,255,255,.05)}
-.dc .evs u{text-decoration:none;font-size:8px;color:var(--muted);text-align:left;padding-left:3px}
-.dc .rt{height:3px;border-radius:2px;background:var(--h0);flex:none;margin-top:1px}
-.dc.sel .rt{opacity:.65}
+.dc .evs i{font-style:normal;font-size:9.5px;font-weight:650;line-height:1.3;text-align:left;
+  padding:2px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc .evs u{text-decoration:none;font-size:8.5px;font-weight:650;color:var(--muted);
+  text-align:left;padding-left:4px}
+body.pixel .dc>b{font-size:12px}
+body.pixel .dc .evs i{font-size:9px;font-family:'Galmuri9','Galmuri11',sans-serif}
+.dc .rt{height:3px;border-radius:2px;background:transparent;flex:none;margin-top:auto}
 .cell{aspect-ratio:1;border-radius:8px;background:var(--h0);display:grid;place-items:center;font-size:11px;color:var(--muted)}
 .cell.l1{background:var(--h1)} .cell.l2{background:var(--h2);color:#D8ECF7}
 .cell.l3{background:var(--h3);color:#fff} .cell.l4{background:var(--h4);color:var(--onAccent)}
@@ -708,12 +712,11 @@ body.pixel .bar,body.pixel .gth .pbar{
 }
 body.pixel .bar i,body.pixel .gth .pbar i{box-shadow:inset 0 2px 0 rgba(255,255,255,.3)}
 
-body.pixel .dc{
-  background:var(--cell);border:2px solid var(--line);
-  box-shadow:inset 0 2px 0 var(--pxHi);
-}
-body.pixel .dc.dim{background:transparent;border-color:transparent}
-body.pixel .dc.sel{border-color:var(--pxSel);background:var(--habit-soft)}
+body.pixel .dc{background:transparent;border:none;border-top:2px solid var(--line);box-shadow:none}
+body.pixel .dc.dim{border-top-color:var(--line)}
+body.pixel .dc>b{border-radius:0 !important}
+body.pixel .dc.sel>b{box-shadow:inset 0 0 0 2px var(--pxSel)}
+body.pixel .dc.tod>b{background:var(--pxSel);color:var(--pxSelInk)}
 body.pixel .dc>b{font-size:12px}
 body.pixel .dc .evs i{background:transparent}
 
@@ -749,7 +752,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v106';
+const APP_VER='v107';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2468,7 +2471,8 @@ function vCal(){
     cells.push(`<button class="dc ${d===view?'sel':''} ${d===today()?'tod':''}" data-selday="${d}">
       <b>${i}</b>
       <span class="evs">${items.slice(0,3).map(x=>
-        `<i style="color:${x.c}">${esc(x.t)}</i>`).join('')}${items.length>3?`<u>+${items.length-3}</u>`:''}</span>
+        `<i style="color:${x.c};background:color-mix(in srgb, ${x.c} 22%, transparent)">${esc(x.t)}</i>`
+        ).join('')}${items.length>3?`<u>+${items.length-3}</u>`:''}</span>
       <span class="rt" style="${isOff?'background:var(--goal);opacity:.45'
         :(r?`background:linear-gradient(90deg,var(--habit) ${r*100}%,var(--h0) ${r*100}%)`:'')}"></span></button>`);
   }
