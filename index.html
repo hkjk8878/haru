@@ -259,9 +259,14 @@ body.pixel .seg4 button u{font-size:9px}
 .todo.done span{color:var(--muted);text-decoration:line-through}
 .todo.gl .box{border-color:#574828}
 .todo.gl.done .box{background:var(--goal);border-color:var(--goal)}
-.addtodo{display:flex;gap:8px;padding:11px 12px 12px;border-top:1px solid var(--line)}
-.addtodo input{flex:1;border:none;background:var(--card2);border-radius:12px;padding:11px 13px;font-size:14.5px}
-.addtodo button{background:var(--task);color:#fff;font-size:13px;font-weight:700;padding:11px 15px;border-radius:12px}
+.addtodo{display:flex;gap:8px;padding:11px 14px 13px;border-top:1px solid var(--line);
+  align-items:center}
+.addtodo input{flex:1;min-width:0;border:none;background:var(--card2);border-radius:12px;
+  padding:11px 13px;font-size:14.5px}
+.addtodo button{flex:none;background:var(--task);color:#fff;font-size:13px;font-weight:700;
+  padding:11px 14px;border-radius:12px;white-space:nowrap}
+body.pixel .addtodo{padding:11px 13px 13px}
+body.pixel .addtodo button{font-size:12px;padding:10px 12px}
 .overdue{margin:12px 16px 0;padding:11px 13px;border-radius:14px;background:var(--task-soft)}
 .overdue p{margin:0;font-size:12.5px;font-weight:650;color:var(--task);display:flex;gap:8px;align-items:center}
 .overdue p button{margin-left:auto;font-size:12px;font-weight:700;color:var(--task);text-decoration:underline}
@@ -733,7 +738,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v103';
+const APP_VER='v104';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
