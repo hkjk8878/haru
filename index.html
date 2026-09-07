@@ -495,18 +495,20 @@ nav button.on{color:var(--ink)}
 .sheet .hint{margin:0 0 14px;font-size:12.5px;color:var(--muted)}
 .field{margin-bottom:13px}
 .field label{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
-.tf{position:relative;display:block}
-.tf input{padding-right:34px !important}
-.tfx{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:24px;height:24px;
-  border-radius:8px;background:var(--cell2);color:var(--muted);font-size:11px;line-height:1;
+.tf{position:relative;display:block;width:100%;min-width:0}
+.tf input[type="time"]{width:100% !important;min-width:0 !important;box-sizing:border-box;
+  padding-right:32px !important;-webkit-appearance:none;appearance:none}
+.tfx{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:22px;height:22px;
+  border-radius:7px;background:var(--cell2);color:var(--muted);font-size:11px;line-height:1;
   display:grid;place-items:center}
 body.pixel .tfx{border:2px solid var(--pxB);box-shadow:none;border-radius:0}
-.field input,.field select,.field textarea{width:100%;border:1.5px solid var(--line);background:var(--card2);
+.field input,.field select,.field textarea{width:100%;box-sizing:border-box;min-width:0;
+  border:1.5px solid var(--line);background:var(--card2);
   border-radius:12px;padding:11px 12px;font-size:15px}
 .field textarea{min-height:64px;resize:vertical}
 .field input.amt{font-size:24px;font-weight:750;letter-spacing:-.02em;padding:12px}
 .row2{display:flex;gap:10px;align-items:flex-start}
-.row2>.field{min-width:0}
+.row2>.field{flex:1 1 0;min-width:0}
 .row2 .field label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row2 .field{flex:1}
 .vrow{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px;align-items:start;
@@ -715,6 +717,7 @@ body.pixel .dc.sel{border-color:var(--pxSel);background:var(--habit-soft)}
 body.pixel .dc>b{font-size:12px}
 body.pixel .dc .evs i{background:transparent}
 
+body.pixel .field input[type="time"]{padding-right:32px}
 body.pixel .field input,body.pixel .field select,body.pixel .field textarea,
 body.pixel .vrow input,body.pixel .vrow select,body.pixel .xt3 input,body.pixel .xt3 select,
 body.pixel .addtodo input,body.pixel .note{
@@ -746,7 +749,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v105';
+const APP_VER='v106';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
