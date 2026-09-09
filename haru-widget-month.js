@@ -61,13 +61,13 @@ if (!data || data.error || !data.month) {
 
   /* 요일 */
   const hd = w.addStack();
-  ["월","화","수","목","금","토","일"].forEach((d, i) => {
+  ["일","월","화","수","목","금","토"].forEach((d, i) => {
     const c = hd.addStack();
     c.size = new Size(45, 11);
     c.centerAlignContent();
     const t = c.addText(d);
     t.font = Font.systemFont(8);
-    t.textColor = i >= 5 ? PINK : FAINT;
+    t.textColor = (i === 0 || i === 6) ? PINK : FAINT;
   });
   w.addSpacer(3);
 
@@ -95,7 +95,7 @@ if (!data || data.error || !data.month) {
 
       const num = cell.addText(String(d));
       num.font = isToday ? Font.boldSystemFont(9.5) : Font.systemFont(9.5);
-      num.textColor = isToday ? new Color("#0A1017") : (c >= 5 ? PINK : INK);
+      num.textColor = isToday ? new Color("#0A1017") : ((c === 0 || c === 6) ? PINK : INK);
 
       const raw = (mo.it || {})[d];
       /* 할 일(k==='t')은 달력에 넣지 않는다 */
