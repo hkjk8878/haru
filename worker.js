@@ -126,7 +126,12 @@ function dueAlarms(rec) {
   const t = localParts(typeof rec.tz === 'number' ? rec.tz : 0);
   const out = [];
   (rec.weekly || []).forEach(a => {
-    if (a.at === t.hm && Array.isArray(a.dow) && a.dow.includes(t.dow)) out.push(a);
+    if (a.at !== t.hm) return;
+    if (!Array.isArray(a.dow) || !a.dow.includes(t.dow)) return;
+    /* skip = 「이 날만 시각 옮기기」를 해 둔 날짜들. 그 날은 매주 알림을 쉬고,
+       dated 쪽에 옮긴 시각으로 따로 들어 있다. */
+    if (Array.isArray(a.skip) && a.skip.includes(t.date)) return;
+    out.push(a);
   });
   (rec.dated || []).forEach(a => {
     if (a.at === t.hm && a.date === t.date) out.push(a);

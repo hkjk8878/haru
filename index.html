@@ -102,6 +102,12 @@ input,select,textarea{font:inherit;color:inherit}
 .sechead button{margin-left:auto;font-size:13px;font-weight:650;color:var(--plan)}
 .addbtn{padding:12px 16px 13px;border-top:1px solid var(--line);font-size:13px;
   font-weight:650;color:var(--plan);display:block;width:100%}
+/* 이 날만 시각 옮기기 */
+.addbtn.shb{color:var(--muted)}
+.addbtn.shb.on{color:var(--goal)}
+.gh small u.shf{text-decoration:none;font-size:10px;font-weight:750;padding:2px 6px;border-radius:5px;
+  background:var(--goal);color:var(--onAccent);vertical-align:1px}
+.lband u.shf{background:var(--goal);color:var(--onAccent);font-size:9px;padding:1px 5px;border-radius:5px}
 .subhead{padding:12px 16px 0;font-size:12px;font-weight:650;color:var(--muted)}
 
 .ddays{display:flex;gap:10px;overflow-x:auto;padding:14px 16px 2px;margin:0 -16px;scrollbar-width:none}
@@ -821,7 +827,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v111';
+const APP_VER='v112';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -947,7 +953,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:37,
+    version:38,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -1024,6 +1030,11 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<38){
+    /* gsh = 그 날만 묶음 시각을 옮긴 분 수 { 묶음id: 분 } */
+    Object.values(d.logs||{}).forEach(l=>{ if(l&&typeof l==='object') l.gsh=l.gsh||{}; });
+    d.version=38;
+  }
   if(d.version<37){
     (d.groups||[]).forEach(g=>{g.weekN=g.weekN||0});
     (d.habits||[]).forEach(h=>{h.weekN=h.weekN||0});
@@ -1331,7 +1342,19 @@ const rMinDow=(h,i,dw)=>{
   const r=roundOf(h,i); return r.m||effMinDow(h,dw);
 };
 const rGroup=(h,i,d)=>rGroupOn(h,i,d);
-const rTime=(h,i,d)=>rTimeDow(h,i,dow(d));
+/* ── 이 날만 묶음 시각 옮기기 ──
+   logs[날짜].gsh = { 묶음id: 분 }. 음수면 앞으로 당긴 것.
+   묶음 하나만 움직이고, 그 안에 든 습관 시각이 같은 만큼 따라간다. */
+const shOf=d=>{const l=log(d); if(!l.gsh) l.gsh={}; return l.gsh};
+const gShift=(gid,d)=>{const m=(log(d).gsh||{})[gid];return typeof m==='number'?m:0};
+const gTime=(g,d)=>{const off=g&&g.time?gShift(g.id,d):0;
+  return off?toTime(toMin(g.time)+off):(g?g.time||'':'')};
+const rTime=(h,i,d)=>{
+  const base=rTimeDow(h,i,dow(d));
+  if(!base) return base;
+  const off=gShift(rGroup(h,i,d),d);
+  return off?toTime(toMin(base)+off):base;
+};
 const rMin=(h,i,d)=>rMinDow(h,i,dow(d));
 const effGroup=(h,d)=>effGroupDow(h,dow(d));
 const effTime=(h,d)=>effTimeDow(h,dow(d));
@@ -1463,7 +1486,7 @@ function alarmsFor(d){
     if(gWeekN(g)&&groupWeekDone(g,d)>=gWeekN(g)) return;
     if(!inMode(g.mode,d)) return;
     const hs=habitsOfGroupOn(g.id,d); if(!hs.length) return;
-    out.push({key:'g'+g.id,at:toMin(g.time)-+g.notify,title:g.name+' 시간이에요',
+    out.push({key:'g'+g.id,at:toMin(gTime(g,d))-+g.notify,title:g.name+' 시간이에요',
       body:hs.map(h=>h.name).join(', '),label:g.name,kind:'루틴'});
   });
   S.habits.forEach(h=>{
@@ -1845,14 +1868,30 @@ function urlB64(str){
 }
 function pushSchedule(){
   const weekly=[], dated=[], t=today(), limit=addDays(t,120);
+  /* 「이 날만 시각 옮기기」를 해 둔 앞으로의 날들
+     → 그 날은 매주 알림을 쉬게 하고(skip), 옮긴 시각으로 따로 예약한다 */
+  const shifts=[];
+  Object.keys(S.logs||{}).forEach(d=>{
+    if(d<t||d>limit) return;
+    const m=(S.logs[d]||{}).gsh||{};
+    Object.keys(m).forEach(gid=>{ if(m[gid]) shifts.push({d,gid}); });
+  });
+  const shDays=gid=>shifts.filter(s=>s.gid===gid).map(s=>s.d);
   S.groups.forEach(g=>{
     if(!g.notify||!g.time) return;
     const hs=S.habits.filter(h=>h.groupId===g.id);
     if(!hs.length) return;
+    const body=hs.map(h=>h.name).join(', ').slice(0,90);
+    const skip=shDays(g.id);
     const at=toMin(g.time)-+g.notify;
-    if(at<0) return;
-    weekly.push({k:'g'+g.id,dow:g.days.slice(),at:toTime(at),
-      title:g.name+' 시간이에요',body:hs.map(h=>h.name).join(', ').slice(0,90)});
+    if(at>=0) weekly.push(Object.assign({k:'g'+g.id,dow:g.days.slice(),at:toTime(at),
+      title:g.name+' 시간이에요',body},skip.length?{skip}:{}));
+    skip.forEach(d=>{
+      if(!gWeekN(g)&&!g.days.includes(dow(d))) return;
+      const a2=toMin(gTime(g,d))-+g.notify;
+      if(a2<0) return;
+      dated.push({k:'g'+g.id+'_'+d,date:d,at:toTime(a2),title:g.name+' 시간이에요',body});
+    });
   });
   S.habits.forEach(h=>{
     if(!h.notify||!alive(h)) return;
@@ -1880,8 +1919,19 @@ function pushSchedule(){
           const at=toMin(ht)-+h.notify; if(at<0) return;
           (map[at]=map[at]||[]).push(dw);
         });
-        Object.keys(map).forEach(at=>weekly.push({k:'h'+h.id+'_'+k+at,dow:map[at],at:toTime(+at),
-          title:h.name+(tms>1?` (${k+1}회차)`:'')+' 시간이에요',body}));
+        Object.keys(map).forEach(at=>{
+          const dows=map[at];
+          const ttl=h.name+(tms>1?` (${k+1}회차)`:'')+' 시간이에요';
+          /* 이 날만 옮긴 날 중, 이 회차가 그 묶음에 들어 있는 날만 쉬게 한다 */
+          const skip=shifts.filter(s=>dows.includes(dow(s.d))&&rGroup(h,k,s.d)===s.gid).map(s=>s.d);
+          weekly.push(Object.assign({k:'h'+h.id+'_'+k+at,dow:dows,at:toTime(+at),title:ttl,body},
+            skip.length?{skip}:{}));
+          skip.forEach(d=>{
+            const ht=rTime(h,k,d); if(!ht) return;
+            const a2=toMin(ht)-+h.notify; if(a2<0) return;
+            dated.push({k:'h'+h.id+'_'+k+'_'+d,date:d,at:toTime(a2),title:ttl,body});
+          });
+        });
       }
     }
   });
@@ -2225,9 +2275,10 @@ function tabRoutine(){
     const byT=(a,b)=>(a.time?toMin(a.time):99999)-(b.time?toMin(b.time):99999);
     const buckets=[];
     gs.forEach(g=>{
-      const rs=occOfGroup(g.id,view).map(o=>({h:o.h,i:o.i,time:rTime(o.h,o.i,view)||g.time||''}));
+      const gt=gTime(g,view);
+      const rs=occOfGroup(g.id,view).map(o=>({h:o.h,i:o.i,time:rTime(o.h,o.i,view)||gt||''}));
       rs.sort(byT);
-      buckets.push({name:g.name,time:g.time||(rs[0]?rs[0].time:''),rows:rs});
+      buckets.push({name:g.name,time:gt||(rs[0]?rs[0].time:''),rows:rs,sh:!!gShift(g.id,view)});
     });
     if(so.length){
       const rs=occSolo(view).map(o=>({h:o.h,i:o.i,time:rTime(o.h,o.i,view)||''}));
@@ -2236,7 +2287,7 @@ function tabRoutine(){
     }
     buckets.sort(byT);
     return head+offCard+`<div class="card"><div class="lst">${buckets.map(bk=>
-      `<div class="lband">${esc(bk.name)}${bk.time?`<u>${bk.time}</u>`:''}</div>`+
+      `<div class="lband">${esc(bk.name)}${bk.sh?'<u class="shf">이 날만</u>':''}${bk.time?`<u>${bk.time}</u>`:''}</div>`+
       bk.rows.map(({h,i:ri,time})=>{
         const tms=habTimes(h.id);
         const c=catOf(h.catId), dn=tms>1?doneN(view,h.id)>(ri||0):isDone(view,h.id), v=doneVal(view,h.id);
@@ -2268,11 +2319,12 @@ function tabRoutine(){
     const done=act.filter(o=>occDone(view,o)).length, full=act.length>0&&done===act.length;
     const hs=occ;
     const col=!!(S.collapsed||{})[g.id];
+    const gt=gTime(g,view), gsh=gShift(g.id,view);
     return `<div class="grp ${full?'full':''}">
       <div class="gh">${ring(act.length?done/act.length:0)}
         <button class="t" data-fold="${g.id}"><b>${esc(g.name)} <i class="fx">${col?'▾':'▴'}</i></b>
-          <small>${g.time?(g.min?`${g.time} → ${toTime(toMin(g.time)+g.min)} (${g.min}분) · `:g.time+' · ')
-            :(g.min?g.min+'분 · ':'')}${done}/${act.length} 완료${occ.length>act.length?` · 쉼 ${occ.length-act.length}`:''}${g.notify?' · 🔔':''}${full?' · 오늘 끝!':''}</small>
+          <small>${gt?(g.min?`${gt} → ${toTime(toMin(gt)+g.min)} (${g.min}분) · `:gt+' · ')
+            :(g.min?g.min+'분 · ':'')}${gsh?'<u class="shf">이 날만</u> · ':''}${done}/${act.length} 완료${occ.length>act.length?` · 쉼 ${occ.length-act.length}`:''}${g.notify?' · 🔔':''}${full?' · 오늘 끝!':''}</small>
           ${gWeekN(g)?(()=>{
             const dn2=groupWeekDone(g,view), need=Math.max(0,gWeekN(g)-dn2);
             const push=need>0&&need>=weekLeftDays(view);
@@ -2280,7 +2332,9 @@ function tabRoutine(){
               need===0?' 채웠어요':(push?` · 남은 ${weekLeftDays(view)}일 안에 ${need}번`:'')}</small>`;})():''}</button>
         <button class="allbtn" data-allgrp="${g.id}">${full?'되돌리기':'모두 체크'}</button></div>
       ${col?'':occ.map(habitRow).join('')+
-        `<button class="addbtn" style="color:var(--habit)" data-addgrp="${g.id}">＋ 이 루틴에 습관 넣기</button>`}</div>`;
+        `<button class="addbtn" style="color:var(--habit)" data-addgrp="${g.id}">＋ 이 루틴에 습관 넣기</button>`+
+        (g.time?`<button class="addbtn shb ${gsh?'on':''}" data-gshift="${g.id}">🕐 ${
+          gsh?'이 날만 옮긴 시각 고치기':'이 날만 시각 옮기기'}</button>`:'')}</div>`;
   }).join('')+
   (so.length?(()=>{
     const occ=occSolo(view);
@@ -3955,10 +4009,37 @@ function budgetSheet(){
       <button class="save" data-savebudget="1">저장</button></div>`);
   focusIn('#f-amt');
 }
+/* ── 이 날만 묶음 시각 옮기기 ── */
+function gsPreview(gid){
+  const g=grpOf(gid), pv=$('#gspv'); if(!g||!pv) return;
+  const base=toMin(g.time), dur=+g.min||0;
+  const v=$('#f-gsend')?$('#f-gsend').value:'';
+  if(!v){ pv.textContent='시각을 고르면 여기에 보여드려요'; return; }
+  const off=toMin(v)-(dur?base+dur:base);
+  const s=base+off, e=s+dur;
+  if(s<0||e>1439){ pv.textContent='그 시각으로는 하루를 넘어가요'; return; }
+  pv.textContent=off===0?'원래 시각과 같아요'
+    :`이 날은 ${toTime(s)}${dur?` → ${toTime(e)}`:''} (${off>0?'+':''}${off}분)`;
+}
+function gshiftSheet(gid){
+  const g=grpOf(gid); if(!g||!g.time) return;
+  const base=toMin(g.time), dur=+g.min||0, off=gShift(gid,view);
+  openSheet(`<h2>이 날만 시각 옮기기</h2>
+    <p class="hint">${md(view)} 하루만 「${esc(g.name)}」을 옮깁니다.
+      원래는 ${g.time}${dur?` → ${toTime(base+dur)} (${dur}분)`:''}이에요.
+      <b>다른 루틴은 그대로</b>고, 이 루틴에 든 습관 시각만 같이 따라갑니다.</p>
+    <div class="field"><label for="f-gsend">${dur?'이 날 끝나는 시각':'이 날 시작 시각'}</label>
+      ${timeSel('f-gsend',toTime(base+off+(dur?dur:0)))}</div>
+    <p class="tip" id="gspv"></p>
+    <div class="actions">
+      ${off?`<button class="del" data-gsreset="${gid}">되돌리기</button>`:''}
+      <button class="save" data-gssave="${gid}">저장</button></div>`);
+  gsPreview(gid);
+}
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -4401,6 +4482,25 @@ document.addEventListener('click',ev=>{
     }
     return;
   }
+  if(d.gshift){ gshiftSheet(d.gshift); return }
+  if(d.gsreset){
+    delete shOf(view)[d.gsreset];
+    save();closeSheet();render();toast('원래 시각으로 되돌렸어요');
+    return;
+  }
+  if(d.gssave){
+    const g=grpOf(d.gssave); if(!g||!g.time) return;
+    const base=toMin(g.time), dur=+g.min||0;
+    const v=$('#f-gsend')?$('#f-gsend').value:'';
+    if(!v){ toast('시각을 골라 주세요'); return; }
+    const off=toMin(v)-(dur?base+dur:base);
+    if(base+off<0||base+off+dur>1439){ toast('그 시각으로는 하루를 넘어가요'); return; }
+    if(off===0) delete shOf(view)[g.id]; else shOf(view)[g.id]=off;
+    save();closeSheet();render();
+    toast(off===0?'원래 시각으로 되돌렸어요'
+      :`${md(view)}만 ${toTime(base+off)}${dur?` → ${toTime(base+off+dur)}`:''}`);
+    return;
+  }
   if(d.unmv){
     const [hid,i]=d.unmv.split(':');
     const m=mvOf(view);
@@ -4745,7 +4845,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:37,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:38,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
@@ -4776,7 +4876,10 @@ document.addEventListener('change',e=>{
   }
   if(e.target.id==='f-kind'){$('#timeRow').style.display=e.target.value==='all'?'none':'flex'}
   if(e.target.dataset&&(e.target.dataset.th||e.target.dataset.tm)){
-    syncTime(e.target.dataset.th||e.target.dataset.tm);
+    const tid=e.target.dataset.th||e.target.dataset.tm;
+    syncTime(tid);
+    /* 이 날만 시각 옮기기 — 고르는 대로 결과를 바로 보여준다 */
+    if(tid==='f-gsend'){ const b=$('[data-gssave]'); if(b) gsPreview(b.dataset.gssave); }
     return;
   }
   if(e.target.id==='f-plan'){
