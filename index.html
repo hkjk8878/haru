@@ -528,6 +528,47 @@ body.pixel .tfx{border:2px solid var(--pxB);box-shadow:none;border-radius:0}
   border-radius:12px;padding:11px 12px;font-size:15px}
 .field textarea{min-height:64px;resize:vertical}
 .field input.amt{font-size:24px;font-weight:750;letter-spacing:-.02em;padding:12px}
+
+/* ── 칸 규격 통일 ──
+   브라우저(특히 아이폰)가 고르는 칸·날짜칸을 제 나름의 모양으로 그려서
+   옆에 있는 글자칸과 높이·글자 위치가 안 맞던 문제. 전부 우리 규격으로 그린다. */
+.field select,.tsel select,
+.field input[type="date"],.field input[type="month"],.field input[type="time"]{
+  -webkit-appearance:none;-moz-appearance:none;appearance:none}
+/* 고르는 칸 화살표는 직접 그린다 (테마색을 따라간다) */
+.field select{padding-right:34px;background-color:var(--card2);background-repeat:no-repeat;
+  background-size:5px 5px;
+  background-position:calc(100% - 19px) 50%,calc(100% - 14px) 50%;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),
+                   linear-gradient(135deg,var(--muted) 50%,transparent 50%)}
+/* 시·분 칸은 좁으니 화살표를 바짝 붙이고, 양쪽 여백을 같게 둬서 숫자가 진짜 가운데 오게 */
+.tsel select{padding-left:20px;padding-right:20px;
+  background-position:calc(100% - 12px) 50%,calc(100% - 7px) 50%}
+/* 날짜·월 칸 — 아이폰이 값을 회색 알약으로 따로 그리던 것을 없애고 글자 위치를 맞춘다 */
+.field input[type="date"],.field input[type="month"]{
+  display:flex;align-items:center}
+.field input[type="date"]::-webkit-date-and-time-value,
+.field input[type="month"]::-webkit-date-and-time-value{
+  text-align:left;margin:0;padding:0;min-width:0;flex:1;overflow:hidden}
+.field input[type="date"]::-webkit-datetime-edit,
+.field input[type="month"]::-webkit-datetime-edit{padding:0;min-width:0;overflow:hidden}
+/* 달력 아이콘은 좁은 칸에서 날짜 글씨를 가려서 안 쓴다. 칸을 누르면 열린다 */
+.field input[type="date"]::-webkit-calendar-picker-indicator,
+.field input[type="month"]::-webkit-calendar-picker-indicator{display:none}
+/* 아주 좁은 화면(옛 SE 등)에서는 날짜 글씨를 조금 줄여 잘리지 않게 */
+@media (max-width:359px){
+  .field input[type="date"],.field input[type="month"]{
+    font-size:13px;padding-left:9px;padding-right:9px}
+}
+/* 숫자칸 위·아래 화살표 제거 — 칸 폭을 먹고 브라우저마다 다르게 나온다 */
+.field input[type="number"],.vrow input[type="number"],.xt3 input[type="number"]{
+  -webkit-appearance:textfield;-moz-appearance:textfield;appearance:textfield}
+.field input[type="number"]::-webkit-outer-spin-button,
+.field input[type="number"]::-webkit-inner-spin-button,
+.vrow input[type="number"]::-webkit-outer-spin-button,
+.vrow input[type="number"]::-webkit-inner-spin-button,
+.xt3 input[type="number"]::-webkit-outer-spin-button,
+.xt3 input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .row2{display:flex;gap:10px;align-items:flex-start}
 .row2>.field{flex:1 1 0;min-width:0}
 .row2 .tf{width:100%}
@@ -550,7 +591,7 @@ body.pixel .tfx{border:2px solid var(--pxB);box-shadow:none;border-radius:0}
 .sec>summary::after{content:'▾';margin-left:auto;font-size:11px;color:var(--muted)}
 .sec[open]>summary::after{content:'▴'}
 .sec .secin{padding:13px 13px 4px}
-.sec .tip{margin:7px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+.tip{margin:7px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
 .svtog{display:block;width:100%;margin-top:8px;padding:10px;border-radius:10px;font-size:12.5px;
   font-weight:650;background:var(--card);color:var(--muted);text-align:center;
   box-shadow:inset 0 0 0 1.5px var(--line)}
@@ -571,16 +612,22 @@ body.pixel .tfx{border:2px solid var(--pxB);box-shadow:none;border-radius:0}
 .xsec[open]>summary::after{content:' ▴'}
 .xt3{display:grid;grid-template-columns:minmax(0,1fr) 86px 58px;gap:5px;margin-top:5px}
 .xt3 select,.xt3 input{width:100%;min-width:0;padding:9px 8px;font-size:13px;margin:0;
-  border:1.5px solid var(--line);border-radius:10px;background:var(--card2);color:var(--ink)}
+  border:1.5px solid var(--line);border-radius:10px;background-color:var(--card2);color:var(--ink)}
 .xt3 select{-webkit-appearance:none;appearance:none}
 .xrow>u{display:block;text-decoration:none;font-size:11px;color:var(--muted);margin-top:5px}
 .vrow label{display:block;min-width:0}
 .vrow label u{display:block;text-decoration:none;font-size:10px;font-weight:650;color:var(--muted);
   margin:0 0 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vrow select,.vrow input{width:100%;min-width:0;padding:9px 8px;font-size:13px;margin:0;
-  border:1.5px solid var(--line);border-radius:10px;background:var(--card2);color:var(--ink)}
-.vrow select{-webkit-appearance:none;appearance:none;padding-right:8px}
+  border:1.5px solid var(--line);border-radius:10px;background-color:var(--card2);color:var(--ink)}
+.vrow select{-webkit-appearance:none;appearance:none}
 .vrow input::placeholder{color:var(--muted)}
+/* 회차 줄의 고르는 칸도 같은 화살표를 붙인다 (시·분 칸은 너무 좁아서 뺀다) */
+.vrow select,.xt3 select{padding-right:20px;background-repeat:no-repeat;background-size:4px 4px;
+  background-position:calc(100% - 11px) 50%,calc(100% - 7px) 50%;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),
+                   linear-gradient(135deg,var(--muted) 50%,transparent 50%)}
+.vrow .tsel select,.xt3 .tsel select{background-image:none;padding-left:2px;padding-right:2px}
 .dayspick{display:flex;gap:5px}
 .dayspick button{flex:1;height:38px;border-radius:11px;background:var(--card2);text-align:center;
   font-size:13px;font-weight:650;color:var(--muted)}
@@ -746,7 +793,7 @@ body.pixel .tsel select{font-size:13px}
 body.pixel .field input,body.pixel .field select,body.pixel .field textarea,
 body.pixel .vrow input,body.pixel .vrow select,body.pixel .xt3 input,body.pixel .xt3 select,
 body.pixel .addtodo input,body.pixel .note{
-  background:var(--card);border:2px solid var(--pxB);color:var(--ink);
+  background-color:var(--card);border:2px solid var(--pxB);color:var(--ink);
   box-shadow:inset 0 2px 0 rgba(0,0,0,.05);
 }
 body.pixel .field label{color:var(--muted)}
@@ -774,7 +821,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v108';
+const APP_VER='v111';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1206,10 +1253,14 @@ const weekNeed=(h,d)=>{const n=hWeekN(h);return n?Math.max(0,n-weekDoneN(h,d)):0
 const weekLeftDays=d=>weekRange(d).filter(x=>x>=d).length;
 /* 남은 날수만큼만 남았으면 오늘 반드시 해야 한다 */
 const mustToday=(h,d)=>{const need=weekNeed(h,d);return need>0&&need>=weekLeftDays(d)};
+/* 주 N회는 「그 묶음 카드가 오늘 끝!이 된 날」을 센다.
+   전에는 습관 단위로 봐서, 하루 여러 번인 습관이 있으면 그 습관의 다른 회차
+   (다른 묶음에 있는 회차)까지 다 해야 세어졌다. 그래서 카드는 「오늘 끝!」인데
+   주 N회는 안 올라갔다. 이제 카드와 똑같이 회차 단위로, 「쉼」은 빼고 센다. */
 function groupWeekDone(g,d){
   return weekRange(d).filter(x=>{
-    const hs=habitsOfGroupOn(g.id,x);
-    return hs.length&&hs.every(h=>isDone(x,h.id));
+    const occ=occOfGroup(g.id,x).filter(o=>!isSkip(x,o.h.id));
+    return occ.length&&occ.every(o=>occDone(x,o));
   }).length;
 }
 const dayOff=d=>!!log(d).off;
@@ -2019,7 +2070,8 @@ function habitRow(o){
   let right='';
   if(sk) right=`<button class="rest on" data-skip="${h.id}">쉼</button>`;
   else {
-    if(h.weekN>0){
+    /* 주 N회 칩은 하루 여러 번이어도 한 줄에만 (회차마다 나와서 두 번씩 보였다) */
+    if(h.weekN>0&&ri===0){
       const wn=weekDoneN(h,view), need=Math.max(0,h.weekN-wn);
       const push=need>0&&need>=weekLeftDays(view);
       right+=`<span class="wkc ${need===0?'ok':(push?'push':'')}">주 ${wn}/${h.weekN}</span>`;
@@ -3958,8 +4010,11 @@ document.addEventListener('click',ev=>{
     save();closeSheet();render();toast('기록했어요');return;
   }
   if(d.allgrp){
-    const hs=habitsOfGroupOn(d.allgrp,view), l=log(view);
-    const full=hs.every(h=>l.habits[h.id]);
+    /* 「쉼」으로 둔 습관은 건드리지 않고, 다 채웠는지도 회차까지 보고 판단한다
+       (전에는 기록만 있으면 다 한 줄 알고 되돌려 버렸다) */
+    const l=log(view);
+    const hs=habitsOfGroupOn(d.allgrp,view).filter(h=>!isSkip(view,h.id));
+    const full=hs.length>0&&hs.every(h=>isDone(view,h.id));
     hs.forEach(h=>{ if(full) delete l.habits[h.id];
       else l.habits[h.id]=Object.assign({at:view===today()?nowHM():'',lv:''},
         l.habits[h.id]||{},{n:habTimes(h.id)}); });
@@ -4619,8 +4674,9 @@ document.addEventListener('click',ev=>{
   if(d.addtogrp){pickGrpSheet();return}
   if(d.pickhab){pickHabSheet();return}
   if(d.allsolo){
-    const so=soloOn(view), l=log(view);
-    const full=so.every(h=>l.habits[h.id]);
+    const l=log(view);
+    const so=soloOn(view).filter(h=>!isSkip(view,h.id));
+    const full=so.length>0&&so.every(h=>isDone(view,h.id));
     so.forEach(h=>{ if(full) delete l.habits[h.id];
       else l.habits[h.id]=Object.assign({at:view===today()?nowHM():'',lv:''},
         l.habits[h.id]||{},{n:habTimes(h.id)}); });
@@ -4698,6 +4754,14 @@ document.addEventListener('click',ev=>{
   }
 });
 
+/* 날짜·월 칸: 달력 아이콘을 없앴으니 칸을 누르면 달력이 열리게 한다.
+   손가락 기기(아이폰)는 원래 눌러서 열리므로 건드리지 않는다. */
+if(!matchMedia('(hover:none)').matches){
+  document.addEventListener('click',e=>{
+    const d=e.target.closest&&e.target.closest('.field input[type="date"],.field input[type="month"]');
+    if(d&&typeof d.showPicker==='function'){ try{ d.showPicker(); }catch(err){} }
+  });
+}
 document.addEventListener('toggle',e=>{
   if(e.target&&e.target.id==='pastTodos') pastOpen=e.target.open;
   if(e.target&&(e.target.id||'').slice(0,3)==='mc-') mOpen[e.target.id.slice(3)]=e.target.open;
