@@ -228,6 +228,7 @@ const N={TWC:5,TPG:9,TPA:3,THA:6,TPP:10,TPV:7,TPD:7,TPC:10,THI:10,TPN:7,
   TMX:9,TMP:8,TMG:8,TMB:7,TPF:4,TP1:5,TM1:8};
 
 const SEEDV=11;
+const APP_VER='1.12';
 
 /* 반별 명단 — 시간표에서 읽음. 틀린 이름은 아래 ROSTER에서 고치면 됩니다. */
 const HOL0=[
@@ -284,21 +285,22 @@ function roster(cls){
 
 function merge(old){
   const fresh=seed();
-  // 직접 추가하거나 옮긴 것(id 앞글자 u/m/k/r)은 그대로 살림
-  const mine=(old.items||[]).filter(i=>/^[umkr]/.test(i.id||''));
-  fresh.items=fresh.items.concat(mine);
-  fresh.books=Object.assign({}, fresh.books, old.books||{});
-  fresh.roster=Object.assign({}, fresh.roster, old.roster||{});
-  fresh.teachers=Object.assign({}, fresh.teachers, old.teachers||{});
-  // 달력: 직접 넣은 연차·중요한 날은 그대로, 공휴일은 고친 것만 반영
+  const sig=i=>[i.cls,i.once||('w'+i.wd),i.kind,i.fmt||'',i.book||''].join('|');
+  const have={};
+  (old.items||[]).forEach(i=>{ have[sig(i)]=1 });
+  // 예전 것은 전부 그대로 두고, 새로 생긴 것만 더함
+  const add=fresh.items.filter(i=>!have[sig(i)]);
+  const out=Object.assign({}, old, {v:SEEDV});
+  out.items=(old.items||[]).concat(add);
+  out.books=Object.assign({}, fresh.books, old.books||{});
+  out.roster=Object.assign({}, fresh.roster, old.roster||{});
+  out.teachers=Object.assign({}, fresh.teachers, old.teachers||{});
   const oldCal=old.cal||[];
-  const mineCal=oldCal.filter(e=>e.type!=='hol');
-  const holEdit={}; oldCal.filter(e=>e.type==='hol').forEach(e=>holEdit[e.date]=e.text);
-  fresh.cal=fresh.cal.map(e=>holEdit[e.date]!==undefined?Object.assign({},e,{text:holEdit[e.date]}):e)
-    .concat(oldCal.filter(e=>e.type==='hol'&&!fresh.cal.some(f=>f.date===e.date)))
-    .concat(mineCal);
-  return fresh;
+  const hasDate={}; oldCal.forEach(e=>{ if(e.type==='hol')hasDate[e.date]=1 });
+  out.cal=oldCal.concat((fresh.cal||[]).filter(e=>!hasDate[e.date]));
+  return out;
 }
+
 function seed(){
   let k=0;
   const A=o=>Object.assign({id:'s'+(++k),sure:true,off:false,n:N[o.cls]},o);
@@ -1124,7 +1126,10 @@ function viewCal(){
 function viewSet(){
   const act=cfg.items;
   let h='<div class="note">'+(WORKER?'이 설정은 <b>링크를 가진 선생님 모두가 같이 보고 고칩니다.</b> (v'+SEEDV+' · rev '+rev+')':'지금은 <b>내 브라우저에만</b> 저장돼요. 파일 맨 위 WORKER 주소를 채우면 다 같이 쓰게 됩니다.')+' 한 줄을 누르면 그 시험만 펼쳐서 고칠 수 있어요. <b class="warn">확인</b>은 제가 확신 못 한 부분, <b class="warn">안 봄</b>은 시험을 안 보는 반(회색)이에요.</div>'
-   +'<div class="toolbar"><button class="btn ghost" data-export="1">백업 복사</button>'
+   +'<div class="note" style="margin:0 0 8px">앱 버전 <b>'+APP_VER+'</b>'
+   +(WORKER?' · 같이 쓰는 중':' · 내 브라우저에만')+'</div>'
+   +'<div class="toolbar"><button class="btn ghost" data-fresh="1">최신으로 새로 고침</button>'
+   +'<button class="btn ghost" data-export="1">백업 복사</button>'
    +'<button class="btn danger" data-reset="1">'+(armed==='reset'?'정말 되돌릴까요?':'처음 상태로')+'</button></div>';
   h+=rosterSection();
   for(let w=1;w<=5;w++){
@@ -1560,6 +1565,17 @@ function wire(){
     const c1=allClasses()[0]||'새 반';
     cfg.items.push({id,cls:c1,kind:'vocab',wd:1,n:roster(c1).length||N[c1]||0,sure:true,off:false});
     editing={}; editing[id]=true; await saveCfg(); render();
+  };
+  const fr=document.querySelector('[data-fresh]');
+  if(fr)fr.onclick=async()=>{
+    try{
+      if('serviceWorker' in navigator){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(rs.map(r=>r.unregister()));
+      }
+      if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))) }
+    }catch(e){}
+    location.reload(true);
   };
   const ex=document.querySelector('[data-export]');
   if(ex)ex.onclick=()=>{const s=JSON.stringify(cfg);
