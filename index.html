@@ -827,7 +827,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v112';
+const APP_VER='v113';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1940,11 +1940,18 @@ function pushSchedule(){
     const body=(e.allDay?'하루 종일':e.start+' 시작')+(e.location?' · '+e.location:'');
     [e.notify,e.notify2].forEach((nv,ix)=>{
       if(!nv) return;
-      if(repType(e)==='week'&&(e.repeatDays||[]).length){
+      /* 매주 반복은 매주 예약으로 보내지만, 「반복 끝내는 날」이 있으면 그럴 수 없다.
+         (끝난 뒤에도 알림이 계속 오던 문제. 「이 날부터 쭉 바꾸기」를 쓰면 바로 드러난다)
+         건너뛴 날은 worker가 skip으로 걸러 준다. */
+      if(repType(e)==='week'&&(e.repeatDays||[]).length&&!e.repEnd){
         const at=base-+nv;
-        if(at>=0) weekly.push({k:'e'+e.id+'_'+ix,dow:e.repeatDays.slice(),at:toTime(at),title:e.title,body});
-        else weekly.push({k:'e'+e.id+'_'+ix,dow:e.repeatDays.map(x=>(x+6)%7),
-          at:toTime(at+1440),title:'내일 '+e.title,body});
+        const skip=(e.skip||[]).filter(x=>x>=t&&x<=limit);
+        const fwd=skip.length?{skip}:{};
+        if(at>=0) weekly.push(Object.assign({k:'e'+e.id+'_'+ix,dow:e.repeatDays.slice(),
+          at:toTime(at),title:e.title,body},fwd));
+        else weekly.push(Object.assign({k:'e'+e.id+'_'+ix,dow:e.repeatDays.map(x=>(x+6)%7),
+          at:toTime(at+1440),title:'내일 '+e.title,body},
+          skip.length?{skip:skip.map(x=>addDays(x,-1))}:{}));
         return;
       }
       for(let i=0;i<120;i++){
@@ -3838,7 +3845,10 @@ function evSheet(id){
       <input id="f-repend" type="date" value="${(e&&e.repEnd)||''}"></div>
     ${(e&&isRepeat(e))?`<div class="quick" style="margin-bottom:6px">
       <button type="button" data-evskip="${e.id}">${md(view)}만 건너뛰기</button>
-      <button type="button" data-evsplit="${e.id}">${md(view)}만 따로 수정</button></div>`:''}
+      <button type="button" data-evsplit="${e.id}">${md(view)}만 따로 수정</button>
+      <button type="button" data-evfrom="${e.id}">${md(view)}부터 쭉 바꾸기</button></div>
+      <p class="tip" style="margin:0 0 10px">「부터 쭉」은 ${md(view)} 전까지는 원래 그대로 두고,
+        ${md(view)}부터를 따로 떼어냅니다. 그다음 시각을 고쳐 저장하세요.</p>`:''}
     <div class="actions">${e?`<button class="del" data-delev="${e.id}">${isRepeat(e)?'전체 삭제':'삭제'}</button>`
       :'<button class="cancel" data-close="1">취소</button>'}
       <button class="save" data-saveev="${e?e.id:''}">저장</button></div>`);
@@ -4039,7 +4049,7 @@ function gshiftSheet(gid){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-evfrom],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -4437,6 +4447,25 @@ document.addEventListener('click',ev=>{
       save();closeSheet();render();evSheet(cp.id);
       toast('이 날만 따로 떼어냈어요');
     }
+    return;
+  }
+  /* 이 날부터 쭉 바꾸기 — 원래 일정은 어제까지로 끝내고,
+     오늘부터를 같은 반복 설정으로 새로 떼어내 바로 고치게 한다 */
+  if(d.evfrom){
+    const ev=S.events.find(x=>x.id===d.evfrom);
+    if(!ev) return;
+    if(!ev.date||view<=ev.date){
+      toast('이 일정의 첫날이에요. 그냥 고쳐서 저장하면 됩니다');
+      return;
+    }
+    if(ev.repEnd&&ev.repEnd<view){ toast('이 날에는 이 일정이 없어요'); return }
+    const cp={...ev,id:uid(),date:view,endDate:view,
+      skip:(ev.skip||[]).filter(x=>x>=view)};
+    ev.repEnd=addDays(view,-1);
+    ev.skip=(ev.skip||[]).filter(x=>x<view);
+    S.events.push(cp);
+    save();closeSheet();render();evSheet(cp.id);
+    toast(md(view)+'부터를 떼어냈어요. 시각을 고쳐 저장하세요');
     return;
   }
   if(d.calfilter){calFilter=d.calfilter;render();return}
