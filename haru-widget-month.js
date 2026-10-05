@@ -47,10 +47,23 @@ if (!data || data.error || !data.month) {
   const hb = data.habit || { done: 0, total: 0 };
   const td = data.todo || { done: 0, total: 0 };
 
+  const DOW = ["일","월","화","수","목","금","토"];
+
+  /* 요일이 밀리던 문제 —
+     서버가 보내준 lead(1일의 요일)·today 를 믿지 않고 이 폰의 날짜로 직접 센다.
+     위젯은 15~30분마다만 갱신되니 서버 기록이 어제 것일 수 있다. */
+  const lead = new Date(y, m - 1, 1).getDay();
+  const days = new Date(y, m, 0).getDate();
+  const now = new Date();
+  const p2 = x => String(x).padStart(2, "0");
+  const curYM = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
+  const todayN = curYM === mo.ym ? now.getDate() : -1;
+
   /* 머리 */
   const head = w.addStack();
+  head.spacing = 0;
   head.centerAlignContent();
-  const ttl = head.addText(`${m}월`);
+  const ttl = head.addText(todayN > 0 ? `${m}월 ${todayN}일 ${DOW[now.getDay()]}` : `${m}월`);
   ttl.font = Font.boldSystemFont(14);
   ttl.textColor = INK;
   head.addSpacer();
@@ -59,11 +72,22 @@ if (!data || data.error || !data.month) {
   sub.textColor = MUTED;
   w.addSpacer(5);
 
+  /* 날짜 칸 — 요일 머리와 같은 폭·같은 간격이어야 안 밀린다 */
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let i = 1; i <= days; i++) cells.push(i);
+  while (cells.length % 7) cells.push(null);
+  const rowsN = cells.length / 7;
+  const cellH = rowsN >= 6 ? 44 : 52;
+  const CW = 45;
+
   /* 요일 */
   const hd = w.addStack();
-  ["일","월","화","수","목","금","토"].forEach((d, i) => {
+  hd.spacing = 0;
+  DOW.forEach((d, i) => {
     const c = hd.addStack();
-    c.size = new Size(45, 11);
+    c.spacing = 0;
+    c.size = new Size(CW, 11);
     c.centerAlignContent();
     const t = c.addText(d);
     t.font = Font.systemFont(8);
@@ -71,25 +95,19 @@ if (!data || data.error || !data.month) {
   });
   w.addSpacer(3);
 
-  /* 날짜 칸 */
-  const cells = [];
-  for (let i = 0; i < mo.lead; i++) cells.push(null);
-  for (let i = 1; i <= mo.days; i++) cells.push(i);
-  while (cells.length % 7) cells.push(null);
-  const rowsN = cells.length / 7;
-  const cellH = rowsN >= 6 ? 44 : 52;
-
   for (let r = 0; r < rowsN; r++) {
     const row = w.addStack();
+    row.spacing = 0;
     for (let c = 0; c < 7; c++) {
       const d = cells[r * 7 + c];
       const cell = row.addStack();
+      cell.spacing = 0;
       cell.layoutVertically();
-      cell.size = new Size(45, cellH);
+      cell.size = new Size(CW, cellH);
       cell.setPadding(2, 3, 2, 1);
       if (d == null) { cell.addText(" "); continue; }
 
-      const isToday = d === mo.today;
+      const isToday = d === todayN;
       if (isToday) { cell.backgroundColor = SKY; cell.cornerRadius = 6; }
       else { cell.backgroundColor = CELL; cell.cornerRadius = 6; }
 

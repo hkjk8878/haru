@@ -434,7 +434,8 @@ body.pixel .dc .evs i{font-size:9px;font-family:'Galmuri9','Galmuri11',sans-seri
 .tx .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .tx .m{flex:1;min-width:0}
 .tx .m b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tx .m small{font-size:11.5px;color:var(--muted)}
+.tx .m small{display:block;font-size:11.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tx .v{font-size:14.5px;font-weight:700;flex:none}
 .tx .v.in{color:#34D399}
 .tx .v.sav{color:var(--plan)}
@@ -827,7 +828,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v113';
+const APP_VER='v116';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -838,10 +839,12 @@ const OFFS=[['','알림 없음'],['0','정시에'],['5','5분 전'],['10','10분
 const offLabel=v=>(OFFS.find(o=>o[0]===String(v))||['',''])[1];
 
 let installEvt=null, homeTab='routine', alarmOpen=false, pastOpen=false;
-let mOpen={fix:true,inc:false,sav:false,out:true,plan:true,rec:true};
+let mOpen={fix:true,inst:true,inc:false,sav:false,out:true,plan:true,rec:true};
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
     calFilter='all', statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
-    sheetDays=[], sheetPick={}, moneyType='out';
+    sheetDays=[], sheetPick={}, moneyType='out',
+    /* 고정 항목 시트에서 종류를 왔다 갔다 해도 고른 분류를 잊지 않게 */
+    fcatKind='', fcatMemo={};
 
 const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
@@ -953,7 +956,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:38,
+    version:39,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -1030,7 +1033,11 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
-  if(d.version<38){
+  if(d.version<39){
+    /* inst = 할부 개월 수 (없거나 1이면 일시불) */
+    (d.money||[]).forEach(m=>{m.inst=+m.inst>1?+m.inst:0});
+    d.version=39;
+  }  if(d.version<38){
     /* gsh = 그 날만 묶음 시각을 옮긴 분 수 { 묶음id: 분 } */
     Object.values(d.logs||{}).forEach(l=>{ if(l&&typeof l==='object') l.gsh=l.gsh||{}; });
     d.version=38;
@@ -1304,6 +1311,51 @@ const fixedOf=ym=>(S.fixed||[]).filter(f=>fixActive(f,ym))
   .sort((a,b)=>((a.ord||0)-(b.ord||0)));
 const fixDay=(f,d)=>Math.min(fixDayOf(f,monthOf(d)),daysIn(monthOf(d)))===+d.slice(8);
 const isSaving=m=>m.type==='out'&&!!(mcatOf(m.catId)||{}).sv;
+/* ── 할부 ──
+   지출은 결제한 날에 전액으로 적어 두고(그 달에 얼마 질렀나가 정확해진다),
+   통장에서 달마다 빠지는 몫은 여기서 따로 계산해 보여 준다.
+   카드값은 보통 다음 달 결제일부터 빠지므로 1회차 = 결제한 다음 달.
+   나눠서 남는 원은 1회차에 몰아 준다. */
+const instN=m=>(!m.plan&&m.type==='out'&&+m.inst>1)?Math.min(60,+m.inst):0;
+const isInst=m=>instN(m)>0;
+const nextYM=ym=>{const[y,mm]=ym.split('-').map(Number);return mm===12?`${y+1}-01`:`${y}-${pad(mm+1)}`};
+const addYM=(ym,n)=>{let r=ym;for(let i=0;i<n;i++) r=nextYM(r);return r};
+/* 그 기록의 회차 목록 [{ym, 회차, 금액}] */
+function instPlan(m){
+  const n=instN(m); if(!n) return [];
+  const base=Math.floor(m.amount/n), rest=m.amount-base*n;
+  const start=monthOf(m.date);
+  return Array.from({length:n},(_,i)=>({ym:addYM(start,i),i:i+1,n,
+    amt:base+(i===0?rest:0)}));
+}
+/* 그 달에 해당하는 회차를 기록 한 줄처럼 만들어 준다.
+   지출 합계·분류·예산·통계는 모두 이 금액을 쓴다 (전액이 아니라 회차 금액). */
+function instRow(m,ym){
+  const hit=instPlan(m).find(x=>x.ym===ym);
+  if(!hit) return null;
+  const dd=Math.min(+m.date.slice(8),daysIn(ym));
+  return {...m,id:m.id+'#'+hit.i,instOf:m.id,instI:hit.i,instTot:m.amount,
+    date:`${ym}-${pad(dd)}`,amount:hit.amt};
+}
+/* 가상 줄의 id에서 원래 기록 id를 꺼낸다 */
+const txId=id=>String(id).split('#')[0];
+/* 그 달에 빠지는 할부 몫 전부 */
+function instDue(ym){
+  const out=[];
+  (S.money||[]).forEach(m=>{ if(!isInst(m)) return;
+    const hit=instPlan(m).find(x=>x.ym===ym);
+    if(hit) out.push({m,...hit}); });
+  return out;
+}
+/* 앞으로 n달치 달별 합계 */
+function instMonths(fromYM,n){
+  return Array.from({length:n},(_,i)=>{const ym=addYM(fromYM,i);
+    const due=instDue(ym);
+    return {ym,due,tot:sum(due,x=>x.amt)};
+  });
+}
+/* 아직 안 끝난 할부 (기준 달에 남은 회차가 있는 것) */
+const instLive=ym=>(S.money||[]).filter(m=>isInst(m)&&instPlan(m).some(x=>x.ym>=ym));
 const isPlan=m=>!!m.plan;
 const outOnly=arr=>arr.filter(m=>!m.plan&&m.type==='out'&&!isSaving(m));
 const savOnly=arr=>arr.filter(m=>!m.plan&&isSaving(m));
@@ -1429,6 +1481,13 @@ function evOnDay(e,d){
   if(t==='nday') return diffDays(e.date,d)%Math.max(1,+e.repN||1)===0;
   if(t==='month') return +d.slice(8)===+e.date.slice(8);
   if(t==='mlast') return lastDayOf(d);
+  /* 매년 같은 날 (생일·기념일). 2월 29일은 윤년이 아닌 해에는 2월 28일로 본다 */
+  if(t==='year'){
+    const md0=e.date.slice(5), md1=d.slice(5);
+    if(+d.slice(8)>daysIn(d.slice(0,7))) return false;
+    if(md1===md0) return true;
+    return md0==='02-29'&&md1==='02-28'&&daysIn(d.slice(0,7))===28;
+  }
   return false;
 }
 const evSpan=e=>(!isRepeat(e)&&e.date&&e.endDate)?diffDays(e.date,e.endDate)+1:1;
@@ -1442,8 +1501,11 @@ function eventsOn(d){
 }
 const todosOn=d=>S.todos.filter(t=>t.date===d)
   .sort((a,b)=>((a.ord||0)-(b.ord||0)));
-const moneyOn=d=>S.money.filter(m=>m.date===d);
-const moneyIn=ym=>S.money.filter(m=>monthOf(m.date)===ym);
+/* 할부는 전액이 아니라 그 달 회차 금액으로 센다 */
+const moneyIn=ym=>[
+  ...(S.money||[]).filter(m=>!isInst(m)&&monthOf(m.date)===ym),
+  ...(S.money||[]).filter(isInst).map(m=>instRow(m,ym)).filter(Boolean)];
+const moneyOn=d=>moneyIn(monthOf(d)).filter(m=>m.date===d);
 const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
 function rateList(d,hs){
   if(dayOff(d)) hs=hs.filter(h=>h.always);
@@ -1642,6 +1704,7 @@ function buildICS(){
       const rr=rt==='week'?'FREQ=WEEKLY;BYDAY='+e.repeatDays.map(x=>BYDAY[x]).join(',')
         :rt==='nday'?`FREQ=DAILY;INTERVAL=${Math.max(1,e.repN||1)}`
         :rt==='month'?`FREQ=MONTHLY;BYMONTHDAY=${+((e.date||'2026-01-01').slice(8))}`
+        :rt==='year'?`FREQ=YEARLY;BYMONTH=${+((e.date||'2026-01-01').slice(5,7))};BYMONTHDAY=${+((e.date||'2026-01-01').slice(8))}`
         :'FREQ=MONTHLY;BYMONTHDAY=-1';
       add({dtstart:'DTSTART:'+icsDT(d,e.allDay?'09:00':e.start),
         dtend:'DTEND:'+icsDT(d,e.allDay?'09:30':e.end),title:e.title,loc:e.location,cat,alarm:al,
@@ -2167,7 +2230,8 @@ function evRow(e,d){
     const rs=rt==='week'?' · 매주 '+e.repeatDays.map(x=>DAYS[x]).join('')
       :rt==='nday'?` · ${e.repN||1}일마다`
       :rt==='month'?` · 매월 ${+((e.date||'2026-01-01').slice(8))}일`
-      :rt==='mlast'?' · 매월 말일':'';
+      :rt==='mlast'?' · 매월 말일'
+      :rt==='year'?` · 매년 ${+((e.date||'2026-01-01').slice(5,7))}월 ${+((e.date||'2026-01-01').slice(8))}일`:'';
     sub=`${e.start}–${e.end}`+rs;
   }
   return `<button class="ev ${on?'now':''}" data-ev="${e.id}" style="border-left-color:${c.color}">
@@ -2756,7 +2820,8 @@ function vCal(){
 function txRow(m){
   const c=mcatOf(m.catId);
   return `<button class="tx" data-tx="${m.id}"><span class="dot" style="background:${c.color}"></span>
-    <span class="m"><b>${esc(m.memo||c.name)}</b><small>${esc(c.name)}${c.sv?' · 저축':''}</small></span>
+    <span class="m"><b>${esc(m.memo||c.name)}</b><small>${esc(c.name)}${c.sv?' · 저축':''}${
+      m.instI?` · ${instN(m)}개월 할부 ${m.instI}/${instN(m)}회차`:''}</small></span>
     <span class="v ${m.type==='in'?'in':isSaving(m)?'sav':'out'}">${m.type==='in'?'+':isSaving(m)?'↓':'−'}${won(m.amount)}</span></button>`;
 }
 function vMoney(){
@@ -2872,6 +2937,37 @@ function vMoney(){
     </div>
     ${sec('fix','고정 지출·수입',`${fxInTot?'+'+shortWon(fxInTot)+' / ':''}−${shortWon(fxTot)}`,fixBody,
       '<button class="add" style="color:var(--goal)" data-newfix="1">＋ 추가</button>')}
+    ${(()=>{
+      /* ── 할부 — 앞으로 통장에서 빠질 몫 ── */
+      const live=instLive(ym);
+      const months=instMonths(ym,7).filter(x=>x.tot>0);
+      const thisTot=sum(instDue(ym),x=>x.amt);
+      if(!live.length&&!thisTot) return '';
+      const mx=Math.max(1,...months.map(x=>x.tot));
+      const ylab=z=>(z.slice(0,4)===ym.slice(0,4)?'':z.slice(2,4)+'년 ')+(+z.slice(5))+'월';
+      const bars=months.map(x=>`<button class="prow" data-mmonth="${x.ym}" style="width:100%">
+        <b>${ylab(x.ym)}${x.ym===ym?' (이번 달)':''}</b>
+        <span class="bar"><i style="width:${x.tot/mx*100}%;background:var(--plan)"></i></span>
+        <small style="width:82px;color:var(--plan)">${shortWon(x.tot)}</small></button>`).join('');
+      const rows2=live.map(mm=>{
+        const pl=instPlan(mm), c=mcatOf(mm.catId);
+        const doneN2=pl.filter(x=>x.ym<ym).length;
+        /* 「남은」은 이번 달을 뺀 다음 달부터 */
+        const leftAmt=sum(pl.filter(x=>x.ym>ym),x=>x.amt);
+        const mine=pl.find(x=>x.ym===ym);
+        return `<button class="tx" data-tx="${mm.id}">
+          <span class="dot" style="background:${c.color}"></span>
+          <span class="m"><b>${esc(mm.memo||c.name)}</b>
+            <small>${md(mm.date)} · ${mine?mine.i:pl[0].n}/${pl[0].n}회차 · 남은 ${shortWon(leftAmt)}</small></span>
+          <span class="v" style="color:${mine?'var(--plan)':'var(--muted)'}">${mine?shortWon(mine.amt):'—'}</span></button>`;
+      }).join('');
+      const body=`<div class="empty" style="padding:2px 16px 10px">할부는 <b>회차 금액만 그 달 지출</b>로 잡힙니다.
+          전액이 한 달에 몰리지 않아요. 1회차는 결제한 달입니다.</div>
+        ${months.length?'<div class="subh">달마다 잡히는 몫</div><div style="padding:2px 0 6px">'+bars+'</div>':''}
+        ${rows2?'<div class="subh">진행 중인 할부</div><div style="padding:2px 0 6px">'+rows2+'</div>'
+          :'<div class="empty">진행 중인 할부가 없어요.</div>'}`;
+      return sec('inst','할부',thisTot?'이번 달 −'+shortWon(thisTot):'—',body);
+    })()}
     ${sec('inc','수입',won(inc),incBody,
       '<button class="add" style="color:#34D399" data-newmcat="in">＋ 분류</button>')}
     ${sec('sav','저축·투자',won(sav),savBody,
@@ -3528,6 +3624,7 @@ function cvSheet(id){
 function fixSheet(id){
   const f=id?(S.fixed||[]).find(x=>x.id===id):null;
   const kind=f?f.type:'out';
+  fcatKind=kind; fcatMemo={[kind]:(f&&f.catId)||''};
   openSheet(`<h2>${f?'고정 항목 수정':'고정 지출·수입 추가'}</h2>
     <p class="hint">매월 같은 날 같은 금액이 나가는 것들이에요.</p><p class="err" id="err"></p>
     <div class="field"><label for="f-fname">이름</label>
@@ -3836,6 +3933,7 @@ function evSheet(id){
         <option value="week" ${repType(e||{})==='week'?'selected':''}>매주 (요일 선택)</option>
         <option value="month" ${repType(e||{})==='month'?'selected':''}>매월 같은 날</option>
         <option value="mlast" ${repType(e||{})==='mlast'?'selected':''}>매월 말일</option>
+        <option value="year" ${repType(e||{})==='year'?'selected':''}>매년 같은 날</option>
       </select></div>
     <div class="field" id="repWeek" style="display:${repType(e||{})==='week'?'block':'none'}">
       <label>반복 요일</label>${daysPicker()}</div>
@@ -3914,6 +4012,12 @@ function txSheet(id){
         <option value="0" ${((m&&m.plan)||wantPlan)?'':'selected'}>이미 쓴·받은 기록</option>
         <option value="1" ${((m&&m.plan)||wantPlan)?'selected':''}>예정 (아직 아님)</option>
       </select></div>
+    <div class="field" id="instBox" style="display:${(moneyType==='out'&&!((m&&m.plan)||wantPlan))?'block':'none'}">
+      <label for="f-inst">할부 (개월)</label>
+      <input id="f-inst" type="number" inputmode="numeric" min="0" max="60"
+        value="${m&&+m.inst>1?+m.inst:''}" placeholder="일시불이면 비워 두세요">
+      <p class="tip">금액은 <b>전액</b>을 넣으세요. 지출은 개월 수로 나눠서
+        결제한 달부터 달마다 조금씩 잡힙니다.</p></div>
     <div id="planBox" style="display:${((m&&m.plan)||wantPlan)?'block':'none'}">
       <div class="field"><label for="f-mtime">알림 시각</label>
         ${timeSel('f-mtime',m?m.time||'09:00':'09:00')}</div>
@@ -4138,7 +4242,7 @@ document.addEventListener('click',ev=>{
   if(d.newgoal){goalSheet(null);return}
   if(d.editgoal){goalSheet(d.editgoal);return}
   if(d.newtx){txSheet(null);return}
-  if(d.tx){txSheet(d.tx);return}
+  if(d.tx){txSheet(txId(d.tx));return}
   if(d.budget){budgetSheet();return}
   if(d.close){closeSheet();return}
 
@@ -4167,7 +4271,11 @@ document.addEventListener('click',ev=>{
     moneyType=d.mtype;
     const f=S.mcats.find(c=>c.type===moneyType); sheetPick.mcat=f?f.id:'';
     document.querySelectorAll('[data-mtype]').forEach(b=>b.classList.toggle('on',b.dataset.mtype===moneyType));
-    $('#catPicks').innerHTML=chipsHTML('mn'); return;
+    $('#catPicks').innerHTML=chipsHTML('mn');
+    /* 할부는 지출에만 쓴다 */
+    const ib=$('#instBox');
+    if(ib) ib.style.display=(moneyType==='out'&&($('#f-plan')||{}).value!=='1')?'block':'none';
+    return;
   }
   if(d.pickm){sheetPick.mcat=d.pickm;
     document.querySelectorAll('[data-pickm]').forEach(b=>b.classList.toggle('on',b.dataset.pickm===d.pickm));return}
@@ -4209,6 +4317,8 @@ document.addEventListener('click',ev=>{
   if(d.delmcat){
     S.mcats=S.mcats.filter(c=>c.id!==d.delmcat);
     S.money.forEach(m=>{if(m.catId===d.delmcat)m.catId=''});
+    /* 고정 항목도 같이 비워 준다 (안 그러면 「분류 없음」으로 남았다) */
+    (S.fixed||[]).forEach(f=>{if(f.catId===d.delmcat)f.catId=''});
     save();closeSheet();render();toast('분류를 삭제했어요. 기록은 남아요.');return;
   }
 
@@ -4348,7 +4458,8 @@ document.addEventListener('click',ev=>{
     const isPl=$('#f-plan').value==='1';
     const o={type:moneyType,catId:sheetPick.mcat,amount,memo:$('#f-memo').value.trim(),
       date:$('#f-date').value||view,
-      plan:isPl, time:isPl?($('#f-mtime').value||'09:00'):'', notify:isPl?$('#f-notify').value:''};
+      plan:isPl, time:isPl?($('#f-mtime').value||'09:00'):'', notify:isPl?$('#f-notify').value:'',
+      inst:(!isPl&&moneyType==='out')?Math.max(0,Math.min(60,+(($('#f-inst')||{}).value)||0)):0};
     if(d.savetx) Object.assign(S.money.find(x=>x.id===d.savetx),o); else S.money.push({id:uid(),...o});
     moneyMonth=monthOf(o.date);
     save();closeSheet();render();toast('기록했어요');return;
@@ -4383,7 +4494,7 @@ document.addEventListener('click',ev=>{
   if(d.delstep){const[gi,si]=d.delstep.split(':');
     const g=S.goals.find(x=>x.id===gi);g.steps=g.steps.filter(x=>x.id!==si);
     save();closeSheet();render();toast('삭제했어요');return}
-  if(d.deltx){S.money=S.money.filter(x=>x.id!==d.deltx);save();closeSheet();render();toast('삭제했어요');return}
+  if(d.deltx){const rid=txId(d.deltx);S.money=S.money.filter(x=>x.id!==rid);save();closeSheet();render();toast('삭제했어요');return}
   if(d.newmode){modeSheet(null);return}
   if(d.editmode){modeSheet(d.editmode);return}
   if(d.savemode!==undefined){
@@ -4874,7 +4985,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:38,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:39,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
@@ -4913,13 +5024,20 @@ document.addEventListener('change',e=>{
   }
   if(e.target.id==='f-plan'){
     const b=$('#planBox'); if(b) b.style.display=e.target.value==='1'?'block':'none';
+    const ib=$('#instBox');
+    if(ib) ib.style.display=(moneyType==='out'&&e.target.value!=='1')?'block':'none';
   }
   if(e.target.id==='f-ftype'){
     const sel=$('#f-fcat');
     if(sel){
       const kd=e.target.value;
+      /* 지출↔수입을 왔다 갔다 하면 고른 분류가 조용히 첫 분류로 바뀌던 문제 */
+      if(fcatKind) fcatMemo[fcatKind]=sel.value;
       sel.innerHTML=S.mcats.filter(c=>c.type===kd)
         .map(c=>`<option value="${c.id}">${esc(c.name)}${c.sv?' (저축)':''}</option>`).join('');
+      fcatKind=kd;
+      const back=fcatMemo[kd];
+      if(back&&S.mcats.some(c=>c.id===back&&c.type===kd)) sel.value=back;
     }
   }
   if(e.target.id==='f-rep'){
