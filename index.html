@@ -828,7 +828,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v116';
+const APP_VER='v117';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1865,18 +1865,23 @@ function sumAuto(){
   clearTimeout(sumTimer);
   sumTimer=setTimeout(()=>pushSummary(),3000);
 }
-async function pushSummary(){
-  if(!S.sync.room||!S.push.url) return;
+/* 왜 안 올라갔는지 알려 준다.
+   전에는 실패를 조용히 삼켜서, 안 올라갔는데도 「올렸어요」라고 했다. */
+async function pushSummary(force){
+  if(!S.sync.room) return {ok:false,why:'동기화 코드가 없어요 (설정 → 기기 동기화)'};
+  if(!S.push.url) return {ok:false,why:'알림 서버 주소가 없어요 (설정 → 폰 알림)'};
   try{
     const body=JSON.stringify(widgetSummary());
-    if(body===lastSumJSON) return;
-    await fetch(S.push.url.replace(/\/$/,'')+'/summary?room='+encodeURIComponent(S.sync.room),
+    if(!force&&body===lastSumJSON) return {ok:true,same:true};
+    const r=await fetch(S.push.url.replace(/\/$/,'')+'/summary?room='+encodeURIComponent(S.sync.room),
       {method:'POST',headers:{'content-type':'application/json'},body});
+    if(!r.ok) return {ok:false,why:`서버가 거절했어요 (${r.status}). 주소가 맞는지 보세요`};
     lastSumJSON=body;
     sumAt=nowHM();
     const el2=document.getElementById('sumAt');
     if(el2) el2.textContent=sumAt;
-  }catch(e){}
+    return {ok:true};
+  }catch(e){ return {ok:false,why:'서버에 못 닿았어요. 주소와 인터넷을 보세요'}; }
 }
 async function syncUp(silent){
   if(!S.sync.room||syncBusy) return false;
@@ -4707,7 +4712,14 @@ document.addEventListener('click',ev=>{
     const u=S.push.url.replace(/\/$/,'')+'/summary?room='+encodeURIComponent(S.sync.room);
     copyText(u); return;
   }
-  if(d.pushsum){ pushSummary().then(()=>toast('요약을 올렸어요')); return; }
+  if(d.pushsum){
+    toast('올리는 중…');
+    pushSummary(true).then(r=>{
+      if(r&&r.ok){ render(); toast('요약을 올렸어요'); }
+      else toast('못 올렸어요 — '+((r&&r.why)||'알 수 없는 이유'));
+    });
+    return;
+  }
   if(d.fixback){
     const f=(S.fixed||[]).find(x=>x.id===d.fixback);
     if(f){ f.skip=(f.skip||[]).filter(x=>x!==moneyMonth); save(); }
