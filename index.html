@@ -509,6 +509,8 @@ nav button.on{color:var(--ink)}
 .sheet .hint{margin:0 0 14px;font-size:12.5px;color:var(--muted)}
 .field{margin-bottom:13px}
 .field label{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
+/* 칸 이름 뒤에 붙는 작은 안내 (예: 비워도 됨) */
+.field label s{text-decoration:none;font-weight:600;font-size:10.5px;opacity:.75}
 .tsel{display:grid;grid-template-columns:1fr 9px 1fr;gap:4px;align-items:stretch;width:100%}
 .tsel select{width:100% !important;min-width:0 !important;text-align:center;text-align-last:center;
   padding-left:4px;padding-right:4px}
@@ -828,7 +830,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v118';
+const APP_VER='v119';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1707,7 +1709,7 @@ function buildICS(){
         :rt==='year'?`FREQ=YEARLY;BYMONTH=${+((e.date||'2026-01-01').slice(5,7))};BYMONTHDAY=${+((e.date||'2026-01-01').slice(8))}`
         :'FREQ=MONTHLY;BYMONTHDAY=-1';
       add({dtstart:'DTSTART:'+icsDT(d,e.allDay?'09:00':e.start),
-        dtend:'DTEND:'+icsDT(d,e.allDay?'09:30':e.end),title:e.title,loc:e.location,cat,alarm:al,
+        dtend:'DTEND:'+icsDT(d,e.allDay?'09:30':(e.end||toTime(toMin(e.start)+60))),title:e.title,loc:e.location,cat,alarm:al,
         rrule:rr+(e.repEnd?';UNTIL='+icsD(e.repEnd)+'T235900Z':'')});
     } else if(e.allDay){
       add({dtstart:'DTSTART;VALUE=DATE:'+icsD(e.date),
@@ -1715,7 +1717,7 @@ function buildICS(){
         title:e.title,loc:e.location,cat,alarm:al});
     } else {
       add({dtstart:'DTSTART:'+icsDT(e.date,e.start),
-        dtend:'DTEND:'+icsDT(e.endDate||e.date,e.end),title:e.title,loc:e.location,cat,alarm:al});
+        dtend:'DTEND:'+icsDT(e.endDate||e.date,e.end||toTime(toMin(e.start)+60)),title:e.title,loc:e.location,cat,alarm:al});
     }
   });
   S.groups.forEach(g=>{
@@ -2236,8 +2238,10 @@ function evRow(e,d){
   const c=ecatOf(e.catId), span=evSpan(e);
   const idx=span>1?diffDays(e.date,d)+1:0;
   const nm=nowMin();
-  const on=d===today()&&!e.allDay&&span===1&&nm>=toMin(e.start)&&nm<toMin(e.end);
-  const tm=e.allDay?'종일':(span>1?(idx===1?e.start:(idx===span?e.end:'···')):e.start);
+  /* 끝 시각을 안 적었으면 「진행 중」을 1시간으로 어림한다 */
+  const endM=e.end?toMin(e.end):toMin(e.start)+60;
+  const on=d===today()&&!e.allDay&&span===1&&nm>=toMin(e.start)&&nm<endM;
+  const tm=e.allDay?'종일':(span>1?(idx===1?e.start:(idx===span?(e.end||e.start):'···')):e.start);
   let sub;
   if(span>1) sub=`${md(e.date)}–${md(e.endDate)} · ${span-1}박 ${span}일 (${idx}일차)`;
   else if(e.allDay) sub='하루 종일';
@@ -2248,7 +2252,8 @@ function evRow(e,d){
       :rt==='month'?` · 매월 ${+((e.date||'2026-01-01').slice(8))}일`
       :rt==='mlast'?' · 매월 말일'
       :rt==='year'?` · 매년 ${+((e.date||'2026-01-01').slice(5,7))}월 ${+((e.date||'2026-01-01').slice(8))}일`:'';
-    sub=`${e.start}–${e.end}`+rs;
+    /* 왼쪽에 이미 시작 시각이 있으니 끝이 없으면 「끝 미정」만 */
+    sub=(e.end?`${e.start}–${e.end}`:'끝 미정')+rs;
   }
   return `<button class="ev ${on?'now':''}" data-ev="${e.id}" style="border-left-color:${c.color}">
     <span class="tm" style="color:${c.color}">${tm}</span>
@@ -3939,8 +3944,8 @@ function evSheet(id){
     <div class="row2" id="timeRow" style="display:${allDay?'none':'flex'}">
       <div class="field"><label for="f-start">시작 시각</label>
         ${timeSel('f-start',e?e.start:'09:00')}</div>
-      <div class="field"><label for="f-end">종료 시각</label>
-        ${timeSel('f-end',e?e.end:'10:00')}</div></div>
+      <div class="field"><label for="f-end">종료 시각 <s>비워도 됨</s></label>
+        ${timeSel('f-end',e?e.end||'':'')}</div></div>
     <div class="field"><label for="f-loc">장소</label>
       <input id="f-loc" type="text" value="${e?esc(e.location||''):''}" placeholder="회의실 A, 강남역" maxlength="40"></div>
     ${notifySelect2(e?e.notify:'','알림 1','f-notify')}
@@ -4432,13 +4437,13 @@ document.addEventListener('click',ev=>{
     const title=$('#f-title').value.trim();
     if(!title) return showErr('일정 이름을 적어 주세요.');
     const allDay=$('#f-kind').value==='all';
-    const start=$('#f-start').value||'09:00', end=$('#f-end').value||'10:00';
+    const start=$('#f-start').value||'09:00', end=$('#f-end').value||'';  /* 끝 시각은 비워 둬도 된다 */
     const loc=$('#f-loc').value.trim(), notify=$('#f-notify').value, catId=sheetPick.ecat||'';
     const rep=$('#f-rep').value;
     const date=$('#f-date').value||view;
     const endDate=$('#f-enddate').value||date;
     if(endDate<date) return showErr('종료 날짜가 시작보다 빠를 수 없어요.');
-    if(!allDay&&endDate===date&&toMin(end)<=toMin(start)) return showErr('종료 시각이 시작보다 늦어야 해요.');
+    if(!allDay&&end&&endDate===date&&toMin(end)<=toMin(start)) return showErr('종료 시각이 시작보다 늦어야 해요.');
     const days=rep==='week'?sheetDays.slice().sort():[];
     if(rep==='week'&&!days.length) return showErr('반복할 요일을 골라 주세요.');
     const prev=d.saveev?S.events.find(x=>x.id===d.saveev):null;
