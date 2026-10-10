@@ -830,7 +830,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v119';
+const APP_VER='v120';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -958,7 +958,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:39,
+    version:40,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -1035,6 +1035,20 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<40){
+    /* oc = 그날 끝낸 「회차 번호」들.
+       전에는 개수(n)만 셌다. 그래서 4회차를 누르면 1~3회차도 같이 체크되고,
+       레벨을 고르면 네 번 다 한 것으로 처리됐다. */
+    Object.values(d.logs||{}).forEach(l=>{
+      Object.values((l&&l.habits)||{}).forEach(r=>{
+        if(r&&typeof r==='object'&&!Array.isArray(r.oc)){
+          const k=Math.max(0,+r.n||1);
+          r.oc=Array.from({length:k},(_,i)=>i);
+        }
+      });
+    });
+    d.version=40;
+  }
   if(d.version<39){
     /* inst = 할부 개월 수 (없거나 1이면 일시불) */
     (d.money||[]).forEach(m=>{m.inst=+m.inst>1?+m.inst:0});
@@ -1258,7 +1272,28 @@ const log=d=>(S.logs[d]||={habits:{},note:''});
 const rec=(d,id)=>log(d).habits[id];
 const habById=id=>S.habits.find(x=>x.id===id);
 const habTimes=id=>{const h=habById(id);return (h&&h.times>1)?h.times:1};
-const doneN=(d,id)=>{const r=rec(d,id);return r?(r.n||1):0};
+/* 그날 끝낸 회차 번호들. 옛 기기에서 온 기록(n만 있는 것)도 받아 준다 */
+function ocOf(d,id){
+  const r=rec(d,id); if(!r) return [];
+  if(Array.isArray(r.oc)) return r.oc;
+  const k=Math.max(0,Math.min(+r.n||1,habTimes(id)));
+  return Array.from({length:k},(_,i)=>i);
+}
+const doneN=(d,id)=>ocOf(d,id).length;
+const occIs=(d,id,i)=>ocOf(d,id).indexOf(i)>=0;
+/* 회차를 통째로 정한다. 비면 기록을 지운다 */
+function setOc(d,id,arr){
+  const l=log(d), t=habTimes(id);
+  const oc=[...new Set(arr)].filter(i=>i>=0&&i<t).sort((a,b)=>a-b);
+  if(!oc.length){
+    /* 체크만 풀고 적어 둔 시각·값·레벨은 남긴다 */
+    const r0=l.habits[id];
+    if(r0&&(r0.at||r0.v||r0.lv)){ r0.oc=[]; r0.n=0; } else delete l.habits[id];
+    return;
+  }
+  const r=l.habits[id]||(l.habits[id]={at:'',lv:''});
+  r.oc=oc; r.n=oc.length;   /* n은 옛 기기 호환용 */
+}
 const skipsOf=d=>{const l=log(d); if(!l.skips) l.skips={}; return l.skips};
 /* 그날만 다른 루틴으로 옮긴 기록 */
 const mvOf=d=>{const l=log(d); if(!l.mv) l.mv={}; return l.mv};
@@ -1460,7 +1495,7 @@ function occOn(d){
 const occSort=(d)=>(a,b)=>((a.h.ord||0)-(b.h.ord||0))||(a.i-b.i);
 const occOfGroup=(gid,d)=>occOn(d).filter(o=>rGroup(o.h,o.i,d)===gid).sort(occSort(d));
 const occSolo=d=>occOn(d).filter(o=>rGroup(o.h,o.i,d)==='').sort(occSort(d));
-const occDone=(d,o)=>doneN(d,o.h.id)>o.i;
+const occDone=(d,o)=>occIs(d,o.h.id,o.i);
 const habitsOfGroupOn=(gid,d)=>{
   const seen={};
   return occOfGroup(gid,d).filter(o=>seen[o.h.id]?false:(seen[o.h.id]=true)).map(o=>o.h);
@@ -2194,7 +2229,7 @@ function levelsOf(h){
 function habitRow(o){
   const h=o.h!==undefined?o.h:o, ri=o.i!==undefined?o.i:0;
   const tms=habTimes(h.id);
-  const dn=tms>1?doneN(view,h.id)>ri:isDone(view,h.id);
+  const dn=tms>1?occIs(view,h.id,ri):isDone(view,h.id);
   const at=doneAt(view,h.id), v=doneVal(view,h.id);
   const c=catOf(h.catId), st=streak(h);
   const lvs=levelsOf(h);
@@ -2228,7 +2263,7 @@ function habitRow(o){
   const tm=et?`<em class="tm2">${et}</em>`:'';
   const mnv=rMin(h,ri,view);
   const tag=lvs.length&&!dn?'lvpick':'hab';
-  const arg=tag==='hab'?`${h.id}:${ri}`:h.id;
+  const arg=`${h.id}:${ri}`;
   return `<div class="hb ${dn?'done':''} ${sk?'skip':''}" style="border-left-color:${c.color}">
     <button class="main" data-${tag}="${arg}"><span class="tick">✓</span>
       <span class="nm">${tm}<span class="nmx">${h.icon?esc(h.icon)+' ':''}${curLv?`<b class="lvb ${cur}">${curLv[1]}</b> `:''}${esc(label)}</span>${alwaysTag}${tms>1?`<em class="mn">${ri+1}회차</em>`:''}${mnv?`<em class="mn">${mnv}분</em>`:''}</span></button>
@@ -2382,7 +2417,7 @@ function tabRoutine(){
       `<div class="lband">${esc(bk.name)}${bk.sh?'<u class="shf">이 날만</u>':''}${bk.time?`<u>${bk.time}</u>`:''}</div>`+
       bk.rows.map(({h,i:ri,time})=>{
         const tms=habTimes(h.id);
-        const c=catOf(h.catId), dn=tms>1?doneN(view,h.id)>(ri||0):isDone(view,h.id), v=doneVal(view,h.id);
+        const c=catOf(h.catId), dn=tms>1?occIs(view,h.id,ri||0):isDone(view,h.id), v=doneVal(view,h.id);
         const st=streak(h), sk=isSkip(view,h.id);
         const lvs=levelsOf(h), cur=(rec(view,h.id)||{}).lv||'';
         const curLv=lvs.find(x=>x[0]===cur);
@@ -3561,14 +3596,17 @@ function pickHabSheet(){
     }).join('')}
     <div class="actions"><button class="cancel" style="flex:1;text-align:center" data-close="1">닫기</button></div>`);
 }
-function lvSheet(hid){
+function lvSheet(a){
+  const [hid,ris]=String(a).split(':');
+  const ri=+(ris||0);
   const h=S.habits.find(x=>x.id===hid);
+  if(!h) return;
   const lvs=levelsOf(h);
   openSheet(`<h2>${esc(h.name)}</h2>
     <p class="hint">오늘 컨디션에 맞는 단계를 고르세요.</p>
-    ${lvs.map(([k,lab,txt])=>`<button class="lvrow" data-checklv="${hid}:${k}">
+    ${lvs.map(([k,lab,txt])=>`<button class="lvrow" data-checklv="${hid}:${k}:${ri}">
       <b class="lvb ${k}">${lab}</b><span>${esc(txt)}</span></button>`).join('')}
-    <button class="lvrow" data-checklv="${hid}:"><b class="lvb">기본</b><span>${esc(h.name)}</span></button>
+    <button class="lvrow" data-checklv="${hid}::${ri}"><b class="lvb">기본</b><span>${esc(h.name)}</span></button>
     <div class="actions"><button class="cancel" style="flex:1;text-align:center" data-close="1">취소</button></div>`);
 }
 function timeSheet(hid){
@@ -4204,16 +4242,13 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.hab){
+    /* 누른 그 회차만 켜고 끈다. 전에는 개수로 세어서 4회차를 누르면 1~3회차도 같이 켜졌다 */
     const [hid,ris]=d.hab.split(':');
     const ri=+(ris||0);
-    const l=log(view), t=habTimes(hid), cur=doneN(view,hid);
-    const want=(cur>ri)?ri:ri+1;
-    if(want<=0) delete l.habits[hid];
-    else {
-      const r=l.habits[hid];
-      if(!r) l.habits[hid]={at:view===today()?nowHM():'',lv:'',n:Math.min(want,t)};
-      else { r.n=Math.min(want,t); if(view===today()) r.at=nowHM(); }
-    }
+    const cur=ocOf(view,hid), on=cur.indexOf(ri)>=0;
+    setOc(view,hid,on?cur.filter(x=>x!==ri):cur.concat([ri]));
+    const r=rec(view,hid);
+    if(r&&!on&&view===today()) r.at=nowHM();
     save();render();return;
   }
   if(d.time){timeSheet(d.time);return}
@@ -4221,7 +4256,11 @@ document.addEventListener('click',ev=>{
   if(d.cleartime){const r=rec(view,d.cleartime);if(r)r.at='';save();closeSheet();render();return}
   if(d.savetime){
     const l=log(view);
-    if(!l.habits[d.savetime]) l.habits[d.savetime]={at:'',lv:'',n:habTimes(d.savetime)};
+    if(!l.habits[d.savetime]){
+      /* 하루 한 번짜리면 기록과 함께 체크. 여러 번이면 어느 회차인지 알 수 없으니 체크는 그대로 */
+      const one=habTimes(d.savetime)===1;
+      l.habits[d.savetime]={at:'',lv:'',oc:one?[0]:[],n:one?1:0};
+    }
     const r=l.habits[d.savetime];
     r.at=$('#f-time').value||'';
     const vi=$('#f-val'); if(vi) r.v=vi.value.trim();
@@ -4234,8 +4273,9 @@ document.addEventListener('click',ev=>{
     const hs=habitsOfGroupOn(d.allgrp,view).filter(h=>!isSkip(view,h.id));
     const full=hs.length>0&&hs.every(h=>isDone(view,h.id));
     hs.forEach(h=>{ if(full) delete l.habits[h.id];
-      else l.habits[h.id]=Object.assign({at:view===today()?nowHM():'',lv:''},
-        l.habits[h.id]||{},{n:habTimes(h.id)}); });
+      else { const r=l.habits[h.id]||(l.habits[h.id]={at:view===today()?nowHM():'',lv:''});
+        r.oc=Array.from({length:habTimes(h.id)},(_,i)=>i); r.n=r.oc.length;
+        if(!r.at&&view===today()) r.at=nowHM(); } });
     save();render(); if(!full) toast('묶음 완료!');
     return;
   }
@@ -4638,7 +4678,7 @@ document.addEventListener('click',ev=>{
       const t=habTimes(hid), m=mvOf(view);
       /* 아직 안 한 회차 하나를 오늘만 이 루틴으로 */
       let idx=0;
-      for(let i=0;i<t;i++){ if(!(doneN(view,hid)>i)){ idx=i; break; } }
+      for(let i=0;i<t;i++){ if(!occIs(view,hid,i)){ idx=i; break; } }
       m[mvKey(hid,idx)]=gid;
       save();closeSheet();render();
       toast(`${md(view)} 하루만 옮겼어요`);
@@ -4951,16 +4991,21 @@ document.addEventListener('click',ev=>{
     const so=soloOn(view).filter(h=>!isSkip(view,h.id));
     const full=so.length>0&&so.every(h=>isDone(view,h.id));
     so.forEach(h=>{ if(full) delete l.habits[h.id];
-      else l.habits[h.id]=Object.assign({at:view===today()?nowHM():'',lv:''},
-        l.habits[h.id]||{},{n:habTimes(h.id)}); });
+      else { const r=l.habits[h.id]||(l.habits[h.id]={at:view===today()?nowHM():'',lv:''});
+        r.oc=Array.from({length:habTimes(h.id)},(_,i)=>i); r.n=r.oc.length;
+        if(!r.at&&view===today()) r.at=nowHM(); } });
     save();render(); if(!full) toast('습관 완료!');
     return;
   }
   if(d.lvpick){lvSheet(d.lvpick);return}
   if(d.checklv){
-    const [hid,k]=d.checklv.split(':');
-    const l=log(view);
-    l.habits[hid]={at:view===today()?nowHM():'',lv:k||'',n:habTimes(hid)};
+    /* 고른 회차 하나만 체크한다. 전에는 n=habTimes 로 그날 전부를 채웠다 */
+    const [hid,k,ris]=d.checklv.split(':');
+    const ri=+(ris||0);
+    const cur=ocOf(view,hid);
+    setOc(view,hid,cur.indexOf(ri)>=0?cur:cur.concat([ri]));
+    const r=rec(view,hid);
+    if(r){ r.lv=k||''; if(view===today()) r.at=nowHM(); }
     save();closeSheet();render();return;
   }
   if(d.week){weekStart=d.week;render();return}
@@ -5018,7 +5063,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:39,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:40,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
