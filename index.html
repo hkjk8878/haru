@@ -77,7 +77,9 @@ input,select,textarea{font:inherit;color:inherit}
 .yearbar .ys{flex:none;font-size:11.5px;font-weight:700;color:var(--muted)}
 .gauges{display:flex;gap:8px;margin-top:14px}
 .gauge{flex:1;background:var(--card);border-radius:16px;padding:11px 12px 12px;box-shadow:var(--shadow);min-width:0}
-.gauge .lab{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--muted);gap:4px}
+/* 「지출」이 지/출 로 쪼개지던 문제 — flex 안의 맨 글자에도 줄바꿈 금지를 건다 */
+.gauge .lab{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;
+  color:var(--muted);gap:4px;white-space:nowrap;overflow:hidden}
 .gauge .lab b{font-size:15px;font-weight:750;color:var(--ink);white-space:nowrap}
 .gauge .lab b s{text-decoration:none;font-weight:500;color:var(--muted);font-size:13px}
 .bar{display:block;width:100%;height:5px;border-radius:99px;background:var(--line);
@@ -88,18 +90,25 @@ input,select,textarea{font:inherit;color:inherit}
 .g-money .bar i{background:var(--goal)}
 
 .card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin-top:14px;overflow:hidden}
-.card > header{display:flex;align-items:center;gap:9px;padding:15px 16px 0}
-.card > header h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
-.card > header .count{font-size:12.5px;color:var(--muted)}
-.card > header .add{margin-left:auto;font-size:13px;font-weight:650;color:var(--plan);flex:none}
+/* 한 줄에 여러 덩어리가 들어가는 곳은 글자가 글자 단위로 쪼개지지 않게 막는다.
+   (좁은 폰·화면 확대에서 「쉬는\n날」처럼 깨지던 문제) */
+.card > header{display:flex;align-items:center;gap:9px;padding:15px 16px 0;min-width:0}
+.card > header h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;
+  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card > header .count{font-size:12.5px;color:var(--muted);flex:none;white-space:nowrap}
+.card > header .add{margin-left:auto;font-size:13px;font-weight:650;color:var(--plan);
+  flex:none;white-space:nowrap}
 .empty{padding:14px 16px 16px;font-size:13.5px;color:var(--muted);line-height:1.6}
 .offday{padding:15px 16px 6px;background:var(--goal-soft)}
 .offday b{display:block;font-size:15px;font-weight:750;color:var(--goal)}
 .offday p{margin:6px 0 0;font-size:12.5px;color:var(--goal);opacity:.85;line-height:1.5}
-.sechead{display:flex;align-items:center;gap:8px;margin:22px 2px 0}
-.sechead h2{margin:0;font-size:14px;font-weight:700}
-.sechead span{font-size:12.5px;color:var(--muted)}
-.sechead button{margin-left:auto;font-size:13px;font-weight:650;color:var(--plan)}
+.sechead{display:flex;align-items:center;gap:8px;margin:22px 2px 0;flex-wrap:wrap}
+.sechead h2{margin:0;font-size:14px;font-weight:700;white-space:nowrap}
+.sechead span{font-size:12.5px;color:var(--muted);white-space:nowrap}
+/* 단추는 절대 쪼개지지 않게. 자리가 모자라면 줄째로 내려간다 */
+.sechead button{margin-left:auto;font-size:13px;font-weight:650;color:var(--plan);
+  flex:none;white-space:nowrap}
+.sechead button~button{margin-left:0}
 .addbtn{padding:12px 16px 13px;border-top:1px solid var(--line);font-size:13px;
   font-weight:650;color:var(--plan);display:block;width:100%}
 /* 이 날만 시각 옮기기 */
@@ -311,7 +320,9 @@ body.pixel .addtodo button{font-size:12px;padding:10px 12px}
   border-top:1px solid var(--line);border-left:3px solid transparent}
 .mrow .info{flex:1;min-width:0}
 .mrow b{display:block;font-size:14.5px;font-weight:650}
-.mrow small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.mrow small{display:block;font-size:12px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mrow .chev{color:var(--muted);font-size:15px;flex:none}
 .mrow .minfo{flex:1;display:flex;align-items:center;gap:11px;min-width:0}
 .mvs{display:flex;flex-direction:column;gap:3px;flex:none}
@@ -319,6 +330,13 @@ body.pixel .addtodo button{font-size:12px;padding:10px 12px}
   font-size:9px;display:grid;place-items:center}
 .mvs button:disabled{opacity:.28}
 .week{display:flex;gap:3px;flex:none}
+/* 아주 좁은 화면(화면 확대 켠 아이폰 등)에서는 요일 칸을 아래로 내려
+   습관 설명이 잘리지 않게 한다 */
+@media (max-width:359px){
+  .mrow .minfo{flex-wrap:wrap}
+  .mrow .info{flex:1 1 100%}
+  .mrow .week{margin-top:5px}
+}
 .week i{width:15px;height:21px;border-radius:5px;background:var(--cell);display:grid;
   place-items:center;font-size:9px;color:#5B6273;font-style:normal;font-weight:650}
 .week i.on{background:var(--habit);color:var(--onAccent)}
@@ -459,8 +477,10 @@ b.out,small.out{color:var(--task)}
 .fxrow .fi{flex:1;display:flex;align-items:center;gap:11px;min-width:0;padding:7px 0}
 .fxrow .fi .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .fxrow .fi .m{flex:1;min-width:0}
-.fxrow .fi .m b{display:block;font-size:14px;font-weight:600}
-.fxrow .fi .m small{font-size:11.5px;color:var(--muted)}
+.fxrow .fi .m b{display:block;font-size:14px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fxrow .fi .m small{display:block;font-size:11.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fxrow .fi .v{font-size:14px;font-weight:700;flex:none}
 .ev .fadd{flex:none;font-size:11.5px;font-weight:700;color:var(--onAccent);background:var(--goal);
   padding:7px 11px;border-radius:999px;align-self:center}
@@ -524,6 +544,11 @@ nav button.on{color:var(--ink)}
 .field textarea{height:auto}
 .vrow input,.vrow select,.xt3 input,.xt3 select{height:38px}
 .addtodo input,.addtodo button{height:44px}
+/* 주간 할 일의 「오늘로」 단추 */
+.todo .wkto{flex:none;font-size:11.5px;font-weight:650;color:var(--plan);
+  background:var(--plan-soft);padding:5px 9px;border-radius:999px;white-space:nowrap}
+/* 좁은 화면에서는 순서 바꾸기 단추를 숨겨 제목에 자리를 준다 */
+@media (max-width:359px){ .wkcard .todo .mvs{display:none} }
 .tf{position:relative;display:block;width:100%;min-width:0}
 .vrow input,.vrow select,.xt3 input,.xt3 select{font-size:12.5px;padding:8px 6px}
 .field input[type="date"],.field input[type="month"]{
@@ -830,7 +855,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v120';
+const APP_VER='v121';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -844,7 +869,7 @@ let installEvt=null, homeTab='routine', alarmOpen=false, pastOpen=false;
 let mOpen={fix:true,inst:true,inc:false,sav:false,out:true,plan:true,rec:true};
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
     calFilter='all', statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
-    sheetDays=[], sheetPick={}, moneyType='out',
+    sheetDays=[], sheetPick={}, moneyType='out', focusWk=false,
     /* 고정 항목 시트에서 종류를 왔다 갔다 해도 고른 분류를 잊지 않게 */
     fcatKind='', fcatMemo={};
 
@@ -958,7 +983,7 @@ const DEF_MCATS=[['food','식비','#C4553C','out'],['cafe','카페·간식','#A9
 function seed(){
   const t=today(), g1=uid(),g2=uid(),g3=uid();
   return {
-    version:40,
+    version:41,
     cats:DEF_CATS.map(([id,name,color])=>({id,name,color})),
     ecats:DEF_ECATS.map(([id,name,color])=>({id,name,color})),
     mcats:DEF_MCATS.map(([id,name,color,type,sv])=>({id,name,color,type,sv:sv==='sv'})),
@@ -1035,6 +1060,11 @@ function migrate(d){
     d.version=9;
   }
   if(d.version<11){ d.collapsed={}; d.homeView='card'; d.version=11; }
+  if(d.version<41){
+    /* wk = 날짜를 못 박지 않은 「그 주 안에 끝낼 할 일」의 그 주 일요일 */
+    (d.todos||[]).forEach(t=>{ t.wk=t.wk||''; });
+    d.version=41;
+  }
   if(d.version<40){
     /* oc = 그날 끝낸 「회차 번호」들.
        전에는 개수(n)만 셌다. 그래서 4회차를 누르면 1~3회차도 같이 체크되고,
@@ -1536,7 +1566,14 @@ function eventsOn(d){
       return toMin(a.start)-toMin(b.start);
     });
 }
-const todosOn=d=>S.todos.filter(t=>t.date===d)
+/* 주간 할 일 — 날짜 대신 그 주(일요일)만 적어 둔 것 */
+const isWeekTodo=t=>!!t.wk&&!t.date;
+const weekTodos=d=>S.todos.filter(t=>isWeekTodo(t)&&t.wk===monStart(d))
+  .sort((a,b)=>((a.ord||0)-(b.ord||0)));
+/* 지난 주에 안 끝낸 것 */
+const weekTodosOld=d=>S.todos.filter(t=>isWeekTodo(t)&&!t.done&&t.wk<monStart(d))
+  .sort((a,b)=>(a.wk<b.wk?-1:1));
+const todosOn=d=>S.todos.filter(t=>!isWeekTodo(t)&&t.date===d)
   .sort((a,b)=>((a.ord||0)-(b.ord||0)));
 /* 할부는 전액이 아니라 그 달 회차 금액으로 센다 */
 const moneyIn=ym=>[
@@ -2108,6 +2145,7 @@ function pushSchedule(){
     }
   });
   S.todos.forEach(td=>{
+    if(!td.date) return;   /* 주간 할 일은 날짜가 없어 예약하지 않는다 */
     if(!td.time||!td.notify||td.done) return;
     if(td.date<t||td.date>limit) return;
     const at=toMin(td.time)-+td.notify;
@@ -2213,6 +2251,7 @@ function render(){
     ['money','₩','가계부'],['stat','◗','통계'],['set','⚙','설정']
   ].map(([k,i,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><u>${i}</u>${l}</button>`).join('')}</div>`;
   if(focusTodo){focusTodo=false;const el=$('#todoInput');if(el)el.focus()}
+  if(focusWk){focusWk=false;const el=$('#wkInput');if(el)el.focus()}
 }
 function ring(p){
   const r=16.5,c=2*Math.PI*r;
@@ -2481,7 +2520,7 @@ function tabRoutine(){
 /* ── 할 일 탭 ── */
 function tabTodo(){
   const list=todosOn(view);
-  const over=view===today()?S.todos.filter(t=>!t.done&&t.date<today()):[];
+  const over=view===today()?S.todos.filter(t=>!t.done&&t.date&&t.date<today()):[];
   const steps=[];
   S.goals.forEach(g=>(g.steps||[]).forEach(x=>{if(x.due&&x.due<=view&&!x.done) steps.push({g,s:x})}));
   return `<div class="card"><header><h2>${md(view)}의 할 일</h2>
@@ -2501,6 +2540,29 @@ function tabTodo(){
       ${(!list.length&&!steps.length)?'<div class="empty">오늘 꼭 끝낼 한 가지만 적어 보세요.</div>':''}</div>
       <div class="addtodo"><input id="todoInput" type="text" placeholder="할 일 적기" maxlength="80">
         <button data-addtodo="1">추가</button></div></div>
+    ${(()=>{
+      /* ── 이번 주에 끝낼 일 ── */
+      const wk=monStart(view), wkEnd=addDays(wk,6);
+      const wl=weekTodos(view), wdn=wl.filter(t=>t.done).length;
+      const old2=view===today()?weekTodosOld(view):[];
+      return `<div class="card wkcard"><header><h2>이번 주에 끝낼 일</h2>
+        <span class="count">${wl.length?`${wdn}/${wl.length}`:''}</span></header>
+        <div class="empty" style="padding:6px 16px 0">${md(wk)} ~ ${md(wkEnd)} · 날짜를 안 정해도 돼요</div>
+        ${old2.length?`<div class="overdue"><p>지난주에 안 끝낸 것 ${old2.length}개
+          <button data-wkmove="1">이번 주로</button></p></div>`:''}
+        <div style="margin-top:10px">
+        ${wl.map((t,i)=>`<div class="todo ${t.done?'done':''}">
+          <button class="box" data-todo="${t.id}" aria-label="완료">✓</button>
+          <button class="ttl" data-edittodo="${t.id}">${esc(t.title)}</button>
+          ${t.done?'':`<button class="wkto" data-wktoday="${t.id}">오늘로</button>`}
+          ${wl.length>1?`<span class="mvs">
+            <button ${i===0?'disabled':`data-tswap="${t.id}:${wl[i-1].id}"`}>▲</button>
+            <button ${i===wl.length-1?'disabled':`data-tswap="${t.id}:${wl[i+1].id}"`}>▼</button></span>`:''}
+        </div>`).join('')}
+        ${!wl.length?'<div class="empty" style="padding-top:4px">이번 주 안에만 끝내면 되는 일을 적어 두세요.</div>':''}</div>
+        <div class="addtodo"><input id="wkInput" type="text" placeholder="이번 주에 끝낼 일" maxlength="80">
+          <button data-addwtodo="1">추가</button></div></div>`;
+    })()}
     ${(()=>{
       const days=[];
       for(let i=1;i<=21;i++){ const d=addDays(view,-i); if(todosOn(d).length) days.push(d); }
@@ -4161,14 +4223,25 @@ async function pushCheck(){
 function todoSheet(id){
   const t=S.todos.find(x=>x.id===id);
   if(!t) return;
+  const wkMode=isWeekTodo(t);
   openSheet(`<h2>할 일 수정</h2><p class="err" id="err"></p>
     <div class="field"><label for="f-ttitle">할 일</label>
       <input id="f-ttitle" type="text" value="${esc(t.title)}" maxlength="80"></div>
-    <div class="row2"><div class="field"><label for="f-tdate">날짜</label>
-        <input id="f-tdate" type="date" value="${t.date}"></div>
-      <div class="field"><label for="f-ttime">시각</label>
-        ${timeSel('f-ttime',t.time||'')}</div></div>
-    ${notifySelect(t.notify||'','알림')}
+    <div class="field"><label for="f-twhen">언제까지</label>
+      <select id="f-twhen">
+        <option value="day" ${wkMode?'':'selected'}>날짜를 정해서</option>
+        <option value="week" ${wkMode?'selected':''}>이번 주 안에 (날짜 없이)</option>
+      </select></div>
+    <div id="tdayBox" style="display:${wkMode?'none':'block'}">
+      <div class="row2"><div class="field"><label for="f-tdate">날짜</label>
+          <input id="f-tdate" type="date" value="${t.date||today()}"></div>
+        <div class="field"><label for="f-ttime">시각</label>
+          ${timeSel('f-ttime',t.time||'')}</div></div>
+      ${notifySelect(t.notify||'','알림')}
+    </div>
+    <p class="tip" id="twkTip" style="display:${wkMode?'block':'none'};margin:-4px 0 12px">
+      ${md(monStart(view))} ~ ${md(addDays(monStart(view),6))} 안에만 끝내면 됩니다.
+      시각 알림은 날짜를 정해야 쓸 수 있어요.</p>
     <div class="actions"><button class="del" data-deltodo="${t.id}">삭제</button>
       <button class="save" data-savetodo="${t.id}">저장</button></div>`);
   focusIn('#f-ttitle');
@@ -4214,7 +4287,7 @@ function gshiftSheet(gid){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-evfrom],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-addwtodo],[data-wktoday],[data-wkmove],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-evfrom],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -4285,7 +4358,29 @@ document.addEventListener('click',ev=>{
     S.todos.push({id:uid(),title:v,date:view,done:false,time:'',notify:'',
       ord:S.todos.length?Math.max(...S.todos.map(x=>x.ord||0))+1:0});
     save();focusTodo=true;render();return}
-  if(d.move){S.todos.forEach(t=>{if(!t.done&&t.date<today())t.date=today()});save();render();toast('오늘로 옮겼어요');return}
+  if(d.move){S.todos.forEach(t=>{if(!t.done&&t.date&&t.date<today())t.date=today()});save();render();toast('오늘로 옮겼어요');return}
+  /* 이번 주에 끝낼 일 — 적기 */
+  if(d.addwtodo){
+    const i=$('#wkInput'), v=i?i.value.trim():'';
+    if(!v){ if(i) i.focus(); return }
+    S.todos.push({id:uid(),title:v,date:'',wk:monStart(view),done:false,time:'',notify:'',
+      ord:S.todos.length?Math.max(...S.todos.map(x=>x.ord||0))+1:0});
+    save();focusWk=true;render();return;
+  }
+  /* 주간 할 일을 오늘 할 일로 끌어오기 */
+  if(d.wktoday){
+    const t=S.todos.find(x=>x.id===d.wktoday);
+    if(t){ t.date=today(); t.wk=''; save();render();toast('오늘 할 일로 옮겼어요'); }
+    return;
+  }
+  /* 지난주에 안 끝낸 것을 이번 주로 */
+  if(d.wkmove){
+    const w=monStart(today());
+    let n=0;
+    S.todos.forEach(t=>{ if(isWeekTodo(t)&&!t.done&&t.wk<w){ t.wk=w; n++; } });
+    save();render();toast(n?`${n}개를 이번 주로 옮겼어요`:'옮길 게 없어요');
+    return;
+  }
   if(d.step){const[gi,si]=d.step.split(':');
     const s=S.goals.find(x=>x.id===gi).steps.find(x=>x.id===si);s.done=!s.done;save();render();return}
   if(d.stepedit){const[gi,si]=d.stepedit.split(':');stepSheet(gi,si);return}
@@ -4838,11 +4933,16 @@ document.addEventListener('click',ev=>{
     const t=S.todos.find(x=>x.id===d.savetodo);
     const ti=$('#f-ttitle').value.trim();
     if(!ti) return showErr('할 일을 적어 주세요.');
-    if($('#f-notify').value&&!$('#f-ttime').value)
+    if((($('#f-twhen')||{}).value)!=='week'&&$('#f-notify').value&&!$('#f-ttime').value)
       return showErr('알림을 쓰려면 시각을 정해 주세요.');
     if(t){
-      t.title=ti; t.date=$('#f-tdate').value||t.date;
-      t.time=$('#f-ttime').value||''; t.notify=$('#f-notify').value;
+      t.title=ti;
+      if((($('#f-twhen')||{}).value)==='week'){
+        t.wk=t.wk||monStart(view); t.date=''; t.time=''; t.notify='';
+      } else {
+        t.wk=''; t.date=$('#f-tdate').value||t.date||today();
+        t.time=$('#f-ttime').value||''; t.notify=$('#f-notify').value;
+      }
     }
     save();closeSheet();render();toast('저장했어요');
     return;
@@ -5063,7 +5163,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.reset){
-    S={version:40,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
+    S={version:41,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
        goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
@@ -5099,6 +5199,12 @@ document.addEventListener('change',e=>{
     /* 이 날만 시각 옮기기 — 고르는 대로 결과를 바로 보여준다 */
     if(tid==='f-gsend'){ const b=$('[data-gssave]'); if(b) gsPreview(b.dataset.gssave); }
     return;
+  }
+  if(e.target.id==='f-twhen'){
+    const wk=e.target.value==='week';
+    const b=$('#tdayBox'), tp=$('#twkTip');
+    if(b) b.style.display=wk?'none':'block';
+    if(tp) tp.style.display=wk?'block':'none';
   }
   if(e.target.id==='f-plan'){
     const b=$('#planBox'); if(b) b.style.display=e.target.value==='1'?'block':'none';
@@ -5138,6 +5244,14 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.id==='wkInput'){
+    e.preventDefault();
+    const v=e.target.value.trim(); if(!v) return;
+    S.todos.push({id:uid(),title:v,date:'',wk:monStart(view),done:false,time:'',notify:'',
+      ord:S.todos.length?Math.max(...S.todos.map(x=>x.ord||0))+1:0});
+    save();focusWk=true;render();
+    return;
+  }
   if(e.key==='Enter'&&e.target.id==='todoInput'){
     e.preventDefault();
     const v=e.target.value.trim(); if(!v) return;
