@@ -855,7 +855,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v121';
+const APP_VER='v122';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -4353,7 +4353,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.todo){const t=S.todos.find(x=>x.id===d.todo);t.done=!t.done;save();render();return}
-  if(d.deltodo){S.todos=S.todos.filter(x=>x.id!==d.deltodo);save();render();return}
+  if(d.deltodo){S.todos=S.todos.filter(x=>x.id!==d.deltodo);save();closeSheet();render();toast('삭제했어요');return}
   if(d.addtodo){const i=$('#todoInput'),v=i.value.trim();if(!v){i.focus();return}
     S.todos.push({id:uid(),title:v,date:view,done:false,time:'',notify:'',
       ord:S.todos.length?Math.max(...S.todos.map(x=>x.ord||0))+1:0});
