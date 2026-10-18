@@ -843,6 +843,7 @@ body.pixel .toast{background:var(--pxB);color:var(--card);border:2px solid var(-
 body.pixel .sec,body.pixel .sec2{border:2px solid var(--line)}
 body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 </style>
+<link rel="stylesheet" href="upgrade.css">
 </head>
 <body>
 <div class="wrap" id="app"><div class="loading">불러오는 중…</div></div>
@@ -855,7 +856,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v122';
+const APP_VER='v123';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -865,7 +866,7 @@ const PALETTE=['#FF6B8A','#FF9CB0','#FF8A5C','#FFB347','#FFD166','#E9E36B',
 const OFFS=[['','알림 없음'],['0','정시에'],['5','5분 전'],['10','10분 전'],['30','30분 전'],['60','1시간 전'],['1440','하루 전']];
 const offLabel=v=>(OFFS.find(o=>o[0]===String(v))||['',''])[1];
 
-let installEvt=null, homeTab='routine', alarmOpen=false, pastOpen=false;
+let installEvt=null, homeTab='todo', alarmOpen=false, pastOpen=false;
 let mOpen={fix:true,inst:true,inc:false,sav:false,out:true,plan:true,rec:true};
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
     calFilter='all', statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
@@ -1204,6 +1205,11 @@ const STORE=(()=>{
 })();
 let timer=null, saveFailed=false;
 function save(){
+  // Local writes are synchronous: navigation cannot cancel the last edit.
+  if(STORE.mode()==='local'){
+    try{localStorage.setItem(KEY,JSON.stringify(S));saveFailed=false;}
+    catch(e){saveFailed=true;toast('저장 공간을 확인하고 설정에서 백업해 주세요.');}
+  }
   clearTimeout(timer);
   timer=setTimeout(async()=>{
     try{
@@ -1225,8 +1231,10 @@ async function load(){
   if(raw){
     try{ S=migrate(JSON.parse(raw)); }catch(e){ S=seed(); }
   } else S=seed();
+  homeTab=(S.homeStart==='last'?(S.homeLast||'todo'):(S.homeStart||'todo'));
+  haruConflict=await STORE.get(KEY+':conflict').then(x=>x?JSON.parse(x):null).catch(()=>null);
   save(); render(); setInterval(tickNotify,20000); tickNotify();
-  lastSyncJSON=JSON.stringify(syncPayload());
+  lastSyncJSON=S.sync.base||JSON.stringify(syncPayload());
   syncStart();
 }
 
@@ -1850,6 +1858,7 @@ function adopt(data,rev){
   S=migrate(data);
   S.push=keepPush;
   S.sync={room:keepSync.room,on:true,rev:rev,at:nowHM()};
+  S.sync.base=JSON.stringify(syncPayload());
   lastSyncJSON=JSON.stringify(syncPayload());
 }
 async function syncDown(silent){
@@ -1857,6 +1866,7 @@ async function syncDown(silent){
   try{
     const j=await syncCall({room:S.sync.room});
     if(!j.data){ if(!silent) toast('서버에 아직 기록이 없어요. 먼저 다른 기기에서 올려 주세요.'); return false; }
+    if(JSON.stringify(syncPayload())!==lastSyncJSON){await haruHoldConflict(j);return false;}
     adopt(j.data,j.rev||0);
     save(); render(); if(!silent) toast('서버 기록을 가져왔어요');
     return true;
@@ -1972,15 +1982,14 @@ async function syncUp(silent){
   if(!S.sync.room||syncBusy) return false;
   syncBusy=true;
   try{
-    const data=syncPayload();
+    const data=JSON.parse(JSON.stringify(syncPayload()));
     const j=await syncCall({room:S.sync.room,rev:S.sync.rev||0,data});
     if(j.stale&&j.data){
-      adopt(j.data,j.rev||0);
-      save(); render();
-      toast('다른 기기 기록이 더 최신이라 그걸 가져왔어요');
+      await haruHoldConflict(j);
+      return false;
     } else {
       S.sync.rev=j.rev||0; S.sync.at=nowHM(); S.sync.on=true;
-      lastSyncJSON=JSON.stringify(data);
+      lastSyncJSON=JSON.stringify(data); S.sync.base=lastSyncJSON;
       save(); pushSummary(); if(!silent){ render(); toast('서버에 올렸어요'); }
     }
     return true;
@@ -1999,6 +2008,7 @@ async function syncStart(){
   try{
     const j=await syncCall({room:S.sync.room});
     if(j.data&&(j.rev||0)>(S.sync.rev||0)){
+      if(JSON.stringify(syncPayload())!==lastSyncJSON){await haruHoldConflict(j);return;}
       adopt(j.data,j.rev||0); save(); render(); toast('다른 기기에서 바뀐 내용을 가져왔어요');
     } else {
       const now=JSON.stringify(syncPayload());
@@ -2263,7 +2273,7 @@ function ring(p){
 }
 function levelsOf(h){
   const L=h.lv||{};
-  return [['mini','Mini',L.mini],['plus','Plus',L.plus],['max','Max',L.max]].filter(x=>x[2]&&x[2].trim());
+  return [['mini','최소만 하기',L.mini],['plus','조금 더',L.plus],['max','충분히',L.max]].filter(x=>x[2]&&x[2].trim());
 }
 function habitRow(o){
   const h=o.h!==undefined?o.h:o, ri=o.i!==undefined?o.i:0;
@@ -2519,20 +2529,20 @@ function tabRoutine(){
 
 /* ── 할 일 탭 ── */
 function tabTodo(){
-  const list=todosOn(view);
+  const list=todosOn(view).sort((a,b)=>Number(!!b.core)-Number(!!a.core));
   const over=view===today()?S.todos.filter(t=>!t.done&&t.date&&t.date<today()):[];
   const steps=[];
   S.goals.forEach(g=>(g.steps||[]).forEach(x=>{if(x.due&&x.due<=view&&!x.done) steps.push({g,s:x})}));
   return `<div class="card"><header><h2>${md(view)}의 할 일</h2>
       <span class="count">${list.filter(t=>t.done).length}/${list.length}</span></header>
       ${over.length?`<div class="overdue"><p>지난 할 일 ${over.length}개
-        <button data-move="1">오늘로 옮기기</button></p></div>`:''}
+        <button data-haru="organize">골라서 정리하기</button></p></div>`:''}
       <div style="margin-top:12px">
       ${steps.map(({g,s})=>`<button class="todo gl" data-step="${g.id}:${s.id}">
         <span class="box">✓</span><span>${esc(s.title)}</span><span class="tag">${esc(g.title)}</span></button>`).join('')}
       ${list.map((t,i)=>`<div class="todo ${t.done?'done':''}">
         <button class="box" data-todo="${t.id}" aria-label="완료">✓</button>
-        <button class="ttl" data-edittodo="${t.id}">${t.time?`<em class="tm2">${t.time}</em>`:''}${esc(t.title)}${t.notify?' 🔔':''}</button>
+        <button class="ttl" data-edittodo="${t.id}">${t.core?'★ ':''}${t.time?`<em class="tm2">${t.time}</em>`:''}${esc(t.title)}${t.notify?' 🔔':''}</button>
         ${list.length>1?`<span class="mvs">
           <button ${i===0?'disabled':`data-tswap="${t.id}:${list[i-1].id}"`}>▲</button>
           <button ${i===list.length-1?'disabled':`data-tswap="${t.id}:${list[i+1].id}"`}>▼</button></span>`:''}
@@ -4358,7 +4368,7 @@ document.addEventListener('click',ev=>{
     S.todos.push({id:uid(),title:v,date:view,done:false,time:'',notify:'',
       ord:S.todos.length?Math.max(...S.todos.map(x=>x.ord||0))+1:0});
     save();focusTodo=true;render();return}
-  if(d.move){S.todos.forEach(t=>{if(!t.done&&t.date&&t.date<today())t.date=today()});save();render();toast('오늘로 옮겼어요');return}
+  if(d.move){S.todos.forEach(t=>{if(!t.done&&t.date&&t.date<today()){t.date=today();t.core=false;}});save();render();toast('오늘로 옮겼어요');return}
   /* 이번 주에 끝낼 일 — 적기 */
   if(d.addwtodo){
     const i=$('#wkInput'), v=i?i.value.trim():'';
@@ -4370,7 +4380,7 @@ document.addEventListener('click',ev=>{
   /* 주간 할 일을 오늘 할 일로 끌어오기 */
   if(d.wktoday){
     const t=S.todos.find(x=>x.id===d.wktoday);
-    if(t){ t.date=today(); t.wk=''; save();render();toast('오늘 할 일로 옮겼어요'); }
+    if(t){ t.date=today(); t.wk=''; t.core=false;t.held=false;save();render();toast('오늘 할 일로 옮겼어요'); }
     return;
   }
   /* 지난주에 안 끝낸 것을 이번 주로 */
@@ -4464,7 +4474,7 @@ document.addEventListener('click',ev=>{
     if(!name) return showErr('분류 이름을 적어 주세요.');
     const isIn=sheetPick.mtype==='in';
     const bv=isIn?0:Math.max(0,+$('#f-bud').value||0);
-    const o={name,color:sheetPick.color,type:sheetPick.mtype, sv:isIn?false:$('#f-sv').value==='1'};
+    const o={name,color:sheetPick.color,type:sheetPick.mtype, sv:isIn?false:$('#f-sv').value==='1',spendKind:$('#haru-kind')?.value||'unset'};
     let cid2=d.savemcat;
     if(cid2) Object.assign(S.mcats.find(x=>x.id===cid2),o);
     else { cid2=uid(); S.mcats.push({id:cid2,...o}); }
@@ -4937,6 +4947,10 @@ document.addEventListener('click',ev=>{
       return showErr('알림을 쓰려면 시각을 정해 주세요.');
     if(t){
       t.title=ti;
+      const nextWeek=(($('#f-twhen')||{}).value)==='week';
+      const nextDate=nextWeek?'':($('#f-tdate').value||t.date||today());
+      if(nextWeek||nextDate!==t.date)t.core=false;
+      t.held=false;
       if((($('#f-twhen')||{}).value)==='week'){
         t.wk=t.wk||monStart(view); t.date=''; t.time=''; t.notify='';
       } else {
@@ -5075,7 +5089,7 @@ document.addEventListener('click',ev=>{
     save();closeSheet();render();toast('루틴으로 옮겼어요. 요일은 묶음과 같아집니다.');
     return;
   }
-  if(d.htab){homeTab=d.htab;render();return}
+  if(d.htab){homeTab=d.htab;S.homeLast=homeTab;save();render();return}
   if(d.homeview){S.homeView=d.homeview;save();render();return}
   if(d.fold){
     S.collapsed||={};
@@ -5291,7 +5305,9 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
-load();
 </script>
+<script src="finance.js"></script>
+<script src="upgrade.js"></script>
+<script>load();</script>
 </body>
 </html>
