@@ -10,9 +10,11 @@
     const compareDay=live?Math.min(end,days(previousYM)):days(previousYM);
     const currentCompareDay=live?compareDay:end;
     const catMap=new Map(cats.map(c=>[c.id,c]));
-    const spending=r=>r.type==='out'&&!catMap.get(r.catId)?.sv;
+    const fixed=r=>!!r.fx||catMap.get(r.catId)?.id==='fix'||catMap.get(r.catId)?.name==='고정비'||catMap.get(r.catId)?.spendKind==='fixed';
+    const spending=r=>r.type==='out'&&!catMap.get(r.catId)?.sv&&!fixed(r);
     const posted=current.filter(r=>!r.plan&&Number(r.date.slice(8))<=end);
     const spent=total(posted.filter(spending));
+    const fixedSpent=total(posted.filter(r=>r.type==='out'&&!catMap.get(r.catId)?.sv&&fixed(r)));
     const savings=total(posted.filter(r=>r.type==='out'&&catMap.get(r.catId)?.sv));
     const income=total(posted.filter(r=>r.type==='in'));
     const planned=total(current.filter(r=>r.plan&&spending(r)));
@@ -20,7 +22,7 @@
     const prev=previous.filter(r=>!r.plan&&Number(r.date.slice(8))<=compareDay&&spending(r));
     const hasComparison=!future&&prev.length>0;
     const actual=posted.filter(spending);
-    const ids=[...new Set([...cats.filter(c=>c.type==='out'&&!c.sv).map(c=>c.id),...actual.map(r=>r.catId)])];
+    const ids=[...new Set([...cats.filter(c=>c.type==='out'&&!c.sv&&c.id!=='fix'&&c.name!=='고정비'&&c.spendKind!=='fixed').map(c=>c.id),...actual.map(r=>r.catId)])];
     const categories=ids.map(id=>{
       const c=catMap.get(id)||{id,name:'분류 없음'};
       const records=actual.filter(r=>r.catId===id);
@@ -33,7 +35,7 @@
     }).sort((a,b)=>b.amount-a.amount);
     const candidate=categories.filter(c=>c.kind==='flex'&&c.amount>0)
       .sort((a,b)=>(b.over||Math.max(0,b.delta||0))-(a.over||Math.max(0,a.delta||0))||b.amount-a.amount)[0]||null;
-    return {spent,savings,income,planned,futureBooked,budget,available:budget?budget-spent-planned-futureBooked:null,
+    return {spent,fixedSpent,remaining:budget?budget-spent:null,savings,income,planned,futureBooked,budget,available:budget?budget-spent-planned-futureBooked:null,
       categories,candidate,hasComparison,compareDay,currentCompareDay,previousYM,end,live,future};
   }
   function csv(rows){

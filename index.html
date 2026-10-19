@@ -844,6 +844,7 @@ body.pixel .sec,body.pixel .sec2{border:2px solid var(--line)}
 body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 </style>
 <link rel="stylesheet" href="upgrade.css">
+<link rel="stylesheet" href="allocation.css">
 </head>
 <body>
 <div class="wrap" id="app"><div class="loading">불러오는 중…</div></div>
@@ -856,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v123';
+const APP_VER='v128';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1013,12 +1014,11 @@ function seed(){
     goals:[{id:uid(),title:'정보처리기사 실기',due:addDays(t,45),from:t,note:'필답형',
       steps:[{id:uid(),title:'이론 1회독',due:addDays(t,14),done:false},
              {id:uid(),title:'기출 5회분',due:addDays(t,30),done:false}]}],
-    money:[{id:uid(),date:t,type:'out',catId:'food',amount:9500,memo:'점심'}],
+    money:[],
     budget:1200000,
     budgets:{[monthOf(t)]:1200000}, catBud:{},
     calViews:[],
-    fixed:[{id:uid(),name:'적금',catId:'saving',amount:300000,day:25,type:'out',time:'09:00',notify:'0',
-      from:monthOf(t),to:'',amt:{},skip:[]}],
+    fixed:[],
     notify:{on:false,fired:{}},
     push:{url:'',id:'',on:false,at:'',err:''},
     sync:{room:'',on:false,rev:0,at:''},
@@ -1231,6 +1231,7 @@ async function load(){
   if(raw){
     try{ S=migrate(JSON.parse(raw)); }catch(e){ S=seed(); }
   } else S=seed();
+  haruCalendarInit();allocationInit();
   homeTab=(S.homeStart==='last'?(S.homeLast||'todo'):(S.homeStart||'todo'));
   haruConflict=await STORE.get(KEY+':conflict').then(x=>x?JSON.parse(x):null).catch(()=>null);
   save(); render(); setInterval(tickNotify,20000); tickNotify();
@@ -1372,7 +1373,10 @@ function carryVal(map,ym){
   const ks=Object.keys(map).filter(k=>k<=ym).sort();
   return ks.length?map[ks[ks.length-1]]:undefined;
 }
-const budgetFor=ym=>{const v=carryVal(S.budgets,ym);return v===undefined?(S.budget||0):v};
+const budgetFor=ym=>{
+  if(S.allocation&&ym>=S.allocation.start){const p=HaruAllocation.planFor(S.allocation,ym);return S.allocation.items.filter(i=>i.group==='living').reduce((n,i)=>n+(+p.amounts[i.id]||0),0);}
+  const v=carryVal(S.budgets,ym);return v===undefined?(S.budget||0):v;
+};
 function catBudFor(ym,cid){
   const maps=S.catBud||{};
   const ks=Object.keys(maps).filter(k=>k<=ym).sort();
@@ -1433,7 +1437,7 @@ function instMonths(fromYM,n){
 const instLive=ym=>(S.money||[]).filter(m=>isInst(m)&&instPlan(m).some(x=>x.ym>=ym));
 const isPlan=m=>!!m.plan;
 const outOnly=arr=>arr.filter(m=>!m.plan&&m.type==='out'&&!isSaving(m));
-const savOnly=arr=>arr.filter(m=>!m.plan&&isSaving(m));
+const savOnly=arr=>allocationSavingsRows(arr);
 const incOnly=arr=>arr.filter(m=>!m.plan&&m.type==='in');
 const planOnly=arr=>arr.filter(m=>m.plan);
 const grpOf=id=>S.groups.find(g=>g.id===id);
@@ -2355,7 +2359,7 @@ function header(){
   const hTot=hs.reduce((a,h)=>a+habTimes(h.id),0);
   const hd=hs.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
   const tdd=td.filter(x=>x.done).length;
-  const spent=sum(outOnly(moneyOn(view)),m=>m.amount);
+  const spent=sum(outOnly(moneyOn(view)).filter(allocationIsLiving),m=>m.amount);
   const mb=budgetFor(monthOf(view));
   const daily=mb?Math.round(mb/daysIn(monthOf(view))):0;
   return `<div class="top"><div class="datenav">
@@ -2378,7 +2382,7 @@ function header(){
         <div class="bar"><i style="width:${hTot?hd/hTot*100:0}%"></i></div></div>
       <div class="gauge g-task"><div class="lab">할 일 <b>${tdd}<s>/${td.length}</s></b></div>
         <div class="bar"><i style="width:${td.length?tdd/td.length*100:0}%"></i></div></div>
-      <button class="gauge g-money" data-tab="money"><div class="lab">지출 <b>${shortWon(spent)}<s>원</s></b></div>
+      <button class="gauge g-money" data-tab="money"><div class="lab">생활비 <b>${shortWon(spent)}<s>원</s></b></div>
         <div class="bar"><i style="width:${daily?Math.min(100,spent/daily*100):0}%"></i></div></button>
     </div></div>`;
 }
@@ -2402,7 +2406,7 @@ function vToday(){
   const hd=hsAll.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
   const td=todosOn(view), tdd=td.filter(x=>x.done).length;
   const evs=eventsOn(view);
-  const out=sum(outOnly(moneyOn(view)),m=>m.amount);
+  const out=sum(outOnly(moneyOn(view)).filter(allocationIsLiving),m=>m.amount);
   const tabs=[['routine','루틴',hTot?`${hd}/${hTot}`:''],
               ['todo','할 일',td.length?`${tdd}/${td.length}`:''],
               ['event','일정',evs.length?String(evs.length):''],
@@ -2529,7 +2533,7 @@ function tabRoutine(){
 
 /* ── 할 일 탭 ── */
 function tabTodo(){
-  const list=todosOn(view).sort((a,b)=>Number(!!b.core)-Number(!!a.core));
+  const list=todosOn(view);
   const over=view===today()?S.todos.filter(t=>!t.done&&t.date&&t.date<today()):[];
   const steps=[];
   S.goals.forEach(g=>(g.steps||[]).forEach(x=>{if(x.due&&x.due<=view&&!x.done) steps.push({g,s:x})}));
@@ -2542,7 +2546,7 @@ function tabTodo(){
         <span class="box">✓</span><span>${esc(s.title)}</span><span class="tag">${esc(g.title)}</span></button>`).join('')}
       ${list.map((t,i)=>`<div class="todo ${t.done?'done':''}">
         <button class="box" data-todo="${t.id}" aria-label="완료">✓</button>
-        <button class="ttl" data-edittodo="${t.id}">${t.core?'★ ':''}${t.time?`<em class="tm2">${t.time}</em>`:''}${esc(t.title)}${t.notify?' 🔔':''}</button>
+        <button class="ttl" data-edittodo="${t.id}">${t.time?`<em class="tm2">${t.time}</em>`:''}${esc(t.title)}${t.notify?' 🔔':''}</button>
         ${list.length>1?`<span class="mvs">
           <button ${i===0?'disabled':`data-tswap="${t.id}:${list[i-1].id}"`}>▲</button>
           <button ${i===list.length-1?'disabled':`data-tswap="${t.id}:${list[i+1].id}"`}>▼</button></span>`:''}
@@ -2748,6 +2752,7 @@ function mgmtRow(h,i,arr){
 const curCV=()=>calFilter.slice(0,2)==='v:'?(S.calViews||[]).find(v=>v.id===calFilter.slice(2)):null;
 const cfEvCats=()=>{
   if(calFilter==='all') return null;
+  if(calFilter==='work'||calFilter==='personal')return S.ecats.filter(c=>haruEventGroup(c)===calFilter).map(c=>c.id);
   const v=curCV(); if(v) return v.cats||[];
   if(calFilter.slice(0,3)==='ev:') return [calFilter.slice(3)];
   return [];
@@ -2756,22 +2761,17 @@ const cfTodo=()=>calFilter==='all'||calFilter==='todo'||!!(curCV()&&curCV().todo
 /* 달력에서 항목끼리 색이 겹치지 않게 쓰는 고정 색 */
 const MC={out:'#FF8A5C',inc:'#34D399',sav:'#22D3EE',fix:'#A78BFA',plan:'#C084FC'};
 /* 가계부는 전체 보기에서 빼고, 가계부 탭이나 보기 묶음에서만 */
-const cfMoney=()=>calFilter==='money'||!!(curCV()&&curCV().money);
+const cfMoney=()=>calFilter==='all'||calFilter==='money'||!!(curCV()&&curCV().money);
 const cfGoal=()=>calFilter==='all'||calFilter==='goal'||!!(curCV()&&curCV().goal);
 const evShown=d=>{const cs=cfEvCats();return eventsOn(d).filter(e=>cs===null||cs.indexOf(e.catId)>=0)};
 const fixOn=d=>fixedOf(monthOf(d)).filter(f=>fixDay(f,d));
 function calFilterBar(){
-  const base=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표']];
-  return `<div class="catbar">
-    ${base.map(([k,l])=>`<button class="catchip ${calFilter===k?'on':''}" data-calfilter="${k}">${l}</button>`).join('')}
-    ${(S.calViews||[]).slice().sort((a,b)=>((a.ord||0)-(b.ord||0))).map(v=>
-      `<button class="catchip ${calFilter==='v:'+v.id?'on':''}" data-calfilter="v:${v.id}">
-        ${esc(v.name)}</button>`).join('')}
-    ${S.ecats.map(c=>`<button class="catchip ${calFilter==='ev:'+c.id?'on':''}" data-calfilter="ev:${c.id}">
-      <u style="color:${calFilter==='ev:'+c.id?'var(--onAccent)':c.color}">●</u>${esc(c.name)}</button>`).join('')}
-    <button class="catchip" data-cvsheet="${curCV()?curCV().id:''}" style="color:var(--habit)">
-      ${curCV()?'✎ 보기 수정':'＋ 보기 묶음'}</button>
-  </div>`;
+  const filters=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표'],['work','일'],['personal','개인']];
+  const selected=calFilter.startsWith('ev:')?ecatOf(calFilter.slice(3)):null;
+  const group=selected?haruEventGroup(selected):calFilter;
+  const sub=(group==='work'||group==='personal')?haruEventChoices().filter(c=>haruEventGroup(c)===group):[];
+  return '<div class="catbar haru-cal-filters">'+filters.map(([k,l])=>`<button class="catchip ${group===k?'on':''}" data-calfilter="${k}">${l}</button>`).join('')+'</div>'+
+    (sub.length?'<div class="catbar haru-cal-sub">'+sub.map(c=>`<button class="catchip ${calFilter==='ev:'+c.id?'on':''}" data-calfilter="ev:${c.id}"><u style="color:${c.color}">●</u>${esc(c.name)}</button>`).join('')+'</div>':'');
 }
 function vCal(){
   const [y,m]=calMonth.split('-').map(Number);
@@ -2797,22 +2797,23 @@ function vCal(){
       S.goals.forEach(g=>{ if(g.due===d) items.push({c:'var(--goal)',t:g.title+' D-DAY'}); });
       S.goals.forEach(g=>(g.steps||[]).forEach(x=>{ if(x.due===d) items.push({c:'var(--goal)',t:x.title}); }));
     }
-    if(hasTd&&calFilter!=='all') items.push({c:'var(--task)',t:'할 일 '+todosOn(d).length});
+    if(hasTd) todosOn(d).forEach(t=>items.push({c:'var(--task)',t:t.title,done:t.done}));
     if(cfMoney()){
       const oAmt=sum(outOnly(mo),x=>x.amount);
-      const sAmt=sum(savOnly(mo),x=>x.amount);
+      const sAmt=sum(savOnly(mo).filter(x=>x.type!=='transfer'),x=>x.amount);
       const iAmt=sum(incOnly(mo),x=>x.amount);
       if(oAmt) items.push({c:MC.out,t:'−'+shortWon(oAmt)});
       if(iAmt) items.push({c:MC.inc,t:'+'+shortWon(iAmt)});
       if(sAmt) items.push({c:MC.sav,t:'↓'+shortWon(sAmt)});
       fxd.forEach(f=>items.push({c:MC.fix,t:f.name}));
       planOnly(mo).forEach(x=>items.push({c:MC.plan,t:x.memo||mcatOf(x.catId).name}));
+      mo.filter(x=>x.type==='transfer'&&!x.plan).forEach(x=>items.push({c:MC.sav,t:'이체 '+shortWon(x.amount)}));
     }
     if(hasNote) items.push({c:'var(--muted)',t:'기록'});
     cells.push(`<button class="dc ${d===view?'sel':''} ${d===today()?'tod':''}" data-selday="${d}">
       <b>${i}</b>
       <span class="evs">${items.slice(0,3).map(x=>
-        `<i style="color:${x.c};background:color-mix(in srgb, ${x.c} 22%, transparent)">${esc(x.t)}</i>`
+        `<i style="color:${x.c};background:color-mix(in srgb, ${x.c} 22%, transparent);${x.done?'text-decoration:line-through;opacity:.55':''}">${esc(x.t)}</i>`
         ).join('')}${items.length>3?`<u>+${items.length-3}</u>`:''}</span>
       <span class="rt" style="${isOff?'background:var(--goal);opacity:.45'
         :(r?`background:linear-gradient(90deg,var(--habit) ${r*100}%,var(--h0) ${r*100}%)`:'')}"></span></button>`);
@@ -2820,11 +2821,11 @@ function vCal(){
   const prevM=m===1?`${y-1}-12`:`${y}-${pad(m-1)}`, nextM=m===12?`${y+1}-01`:`${y}-${pad(m+1)}`;
   const evs=evShown(view), dueG=cfGoal()?S.goals.filter(g=>g.due===view):[];
   const dueS=[]; if(cfGoal()) S.goals.forEach(g=>(g.steps||[]).forEach(s=>{if(s.due===view)dueS.push({g,s})}));
-  const upcoming=S.events.filter(e=>!isRepeat(e)&&e.date&&evSpan(e)>1&&(e.endDate||e.date)>=today())
+  const upcoming=S.events.filter(e=>(cfEvCats()===null||cfEvCats().includes(e.catId))&&!isRepeat(e)&&e.date&&evSpan(e)>1&&(e.endDate||e.date)>=today())
     .sort((a,b)=>a.date<b.date?-1:1);
 
   return `<div class="top"><div class="datenav"><div><h1>달력</h1>
-      <p class="sub">일정은 분류 색, 목표는 노랑. 가계부는 위 <b>가계부</b>를 눌러서 봅니다.</p></div>
+      </div>
       <button class="pill h" data-newev="1">＋ 일정</button></div>
       ${calFilterBar()}</div>
     <div class="card">
@@ -2832,9 +2833,7 @@ function vCal(){
         <button class="r" data-cal="${nextM}">›</button></div>
       <div class="cal"><div class="hd">${DAYS.map(d=>`<span>${d}</span>`).join('')}</div>
         <div class="grid">${cells.join('')}</div></div>
-      <div class="catbar" style="margin:0;padding:0 16px 14px">${S.ecats.map(c=>
-        `<span class="catchip" style="box-shadow:none;background:var(--paper)">
-          <u style="color:${c.color}">●</u>${esc(c.name)}</span>`).join('')}</div></div>
+</div>
     <div class="card"><header><h2>${md(view)} ${DAYS[dow(view)]}요일</h2>
       <button class="add" data-newev="1">＋ 일정</button></header>
       ${dueG.map(g=>`<div class="ev gl"><span class="tm">D-DAY</span>
@@ -2855,16 +2854,17 @@ function vCal(){
             <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(fixAmt(f,monthOf(view)))}${done?' · 기록됨':''}</small></span>
           ${done?'':`<button class="fadd" data-addfix="${f.id}">넣기</button>`}</div>`;
       }).join(''):''}
+      ${cfMoney()?moneyOn(view).filter(x=>x.type==='transfer'&&!x.plan).map(txRow).join(''):''}
       ${cfMoney()?planOnly(moneyOn(view)).map(x=>{
         const c=mcatOf(x.catId);
         const cl=MC.plan;
         return `<div class="ev" style="border-left-color:${cl};border-left-style:dashed">
-          <span class="tm" style="color:${cl}">예정 ${x.type==='in'?'수입':(c.sv?'저축':'지출')}</span>
+          <span class="tm" style="color:${cl}">예정 ${x.type==='transfer'?'이체':x.type==='in'?'수입':(c.sv?'저축':'지출')}</span>
           <span class="bd"><b style="font-weight:600">${esc(x.memo||c.name)}${x.notify?' 🔔':''}</b>
             <small>${esc(c.name)}${x.time?' · '+x.time:''} · ${won(x.amount)}</small></span>
           <button class="fadd" data-planok="${x.id}">완료</button></div>`;
       }).join(''):''}
-      ${cfMoney()?moneyOn(view).filter(v=>!v.plan).map(mm=>{
+      ${cfMoney()?moneyOn(view).filter(v=>!v.plan&&v.type!=='transfer').map(mm=>{
         const c=mcatOf(mm.catId);
         return `<button class="ev" data-tx="${mm.id}" style="border-left-color:${c.color}">
           <span class="tm" style="color:${mm.type==='in'?MC.inc:c.sv?MC.sav:MC.out}">${mm.type==='in'?'수입':c.sv?'저축':'지출'}</span>
@@ -3531,12 +3531,12 @@ const notifySelect=(v,lab)=>`<div class="field"><label for="f-notify">${lab}</la
   <select id="f-notify">${OFFS.map(([k,l])=>`<option value="${k}" ${String(v||'')===k?'selected':''}>${l}</option>`).join('')}</select></div>`;
 const syncDays=()=>document.querySelectorAll('[data-day]')
   .forEach(b=>b.classList.toggle('on',sheetDays.includes(+b.dataset.day)));
-const focusIn=id=>setTimeout(()=>{const e=$(id);if(e)e.focus()},260);
+const focusIn=id=>setTimeout(()=>{const e=$(id);if(e&&(!e.closest('#sheet')||$('#sheet').classList.contains('open')))e.focus({preventScroll:true})},260);
 function showErr(m){const e=$('#err');if(e){e.textContent=m;e.classList.add('on')}}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900)}
 function catArr(kind){
-  return kind==='hab'?S.cats:kind==='ev'?S.ecats:S.mcats.filter(c=>c.type===moneyType);
+  return kind==='hab'?S.cats:kind==='ev'?haruEventChoices():S.mcats.filter(c=>c.type===moneyType);
 }
 function inlineNew(kind){
   return `<div id="catNew" style="display:none;margin-top:8px;padding:11px;border-radius:12px;background:var(--card2)">
@@ -4258,8 +4258,8 @@ function todoSheet(id){
 }
 function budgetSheet(){
   const [by,bm]=moneyMonth.split('-').map(Number);
-  openSheet(`<h2>${by}년 ${bm}월 예산</h2>
-    <p class="hint">이 달부터 적용됩니다. 다음 달에 다시 정하면 그때부터 바뀌어요.</p>
+  openSheet(`<h2>${bm}월 생활비 예산</h2>
+    <p class="hint">고정비·저축을 제외한 금액이에요.</p>
     <div class="field"><label for="f-amt">금액 (0이면 해제)</label>
       <input class="amt" id="f-amt" type="number" inputmode="numeric" min="0" step="10000"
         value="${budgetFor(moneyMonth)||''}" placeholder="0"></div>
@@ -4947,9 +4947,6 @@ document.addEventListener('click',ev=>{
       return showErr('알림을 쓰려면 시각을 정해 주세요.');
     if(t){
       t.title=ti;
-      const nextWeek=(($('#f-twhen')||{}).value)==='week';
-      const nextDate=nextWeek?'':($('#f-tdate').value||t.date||today());
-      if(nextWeek||nextDate!==t.date)t.core=false;
       t.held=false;
       if((($('#f-twhen')||{}).value)==='week'){
         t.wk=t.wk||monStart(view); t.date=''; t.time=''; t.notify='';
@@ -5178,7 +5175,7 @@ document.addEventListener('click',ev=>{
   }
   if(d.reset){
     S={version:41,cats:S.cats,ecats:S.ecats,mcats:S.mcats,groups:[],habits:[],events:[],todos:[],
-       goals:[],money:[],budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
+       goals:[],money:[],allocation:S.allocation,budget:0,notify:{on:S.notify.on,fired:{}},push:S.push,sync:S.sync,
        fixed:S.fixed,budgets:S.budgets,catBud:S.catBud,calViews:S.calViews,lines:S.lines,lineMode:S.lineMode,modes:S.modes,activeModeId:S.activeModeId,modeOverride:null,
        collapsed:{},homeView:S.homeView,
        logs:{},seeded:false};
@@ -5195,6 +5192,7 @@ if(!matchMedia('(hover:none)').matches){
   });
 }
 document.addEventListener('toggle',e=>{
+  if(!e.target?.isConnected)return;
   if(e.target&&e.target.id==='pastTodos') pastOpen=e.target.open;
   if(e.target&&(e.target.id||'').slice(0,3)==='mc-') mOpen[e.target.id.slice(3)]=e.target.open;
 },true);
@@ -5307,7 +5305,10 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
 }
 </script>
 <script src="finance.js"></script>
+<script src="ui-state.js"></script>
 <script src="upgrade.js"></script>
+<script src="allocation.js"></script>
+<script src="allocation-ui.js"></script>
 <script>load();</script>
 </body>
 </html>

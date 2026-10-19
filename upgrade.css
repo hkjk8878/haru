@@ -19,3 +19,24 @@
 @media(max-width:380px){.haru-board{padding:14px}.haru-kpis strong{font-size:18px}.haru-kpis div{padding:10px}}
 @media(min-width:850px){body.haru-money #app{max-width:960px}body.haru-money .haru-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(min-width:1000px){.haru-money-grid{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(0,1.6fr);gap:14px;align-items:start}.haru-money-grid .haru-board{padding:16px}.haru-table{min-width:510px}.haru-table th,.haru-table td{padding:10px 6px;font-size:11px}}
+/* Essential labels stay together; longer user content wraps between words. */
+body{word-break:keep-all;overflow-wrap:break-word;text-wrap:pretty}
+h1,h2,h3,button,label,summary{word-break:keep-all}
+.top .sub{display:none!important}
+.haru-actions button,.pill,.catchip,.haru-fold>summary{white-space:nowrap}
+body.haru-input-active nav{visibility:hidden!important;pointer-events:none!important}
+.sheet:not(.open){visibility:hidden;pointer-events:none}
+.sheet.open{visibility:visible;pointer-events:auto}
+.haru-living-kpis{display:grid;gap:0;margin:12px 0}
+.haru-living-kpis>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);min-width:0}
+.haru-living-kpis span{white-space:nowrap;color:var(--muted);font-size:13px;flex:none}
+.haru-living-kpis strong{white-space:nowrap;font-size:clamp(18px,5vw,25px);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.haru-line{display:flex;justify-content:space-between;gap:14px;align-items:baseline;font-size:14px;margin:14px 0}
+.haru-line span{color:var(--muted);white-space:nowrap;font-size:12px}.haru-line b{text-align:right}
+.haru-fold>summary{cursor:pointer;font-size:14px;font-weight:650;padding:2px 0}
+.haru-fold[open]>summary{margin-bottom:14px}
+.haru-goal-amount{font-size:16px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.haru-cal-filters{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px!important;overflow:visible!important}
+.haru-cal-filters .catchip{padding:9px 0!important;justify-content:center;text-align:center;margin:0!important;font-size:12px;min-width:0}
+@media(min-width:650px){.haru-living-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.haru-living-kpis>div{display:block;border-bottom:0}.haru-living-kpis span{display:block;margin-bottom:8px}.haru-living-kpis strong{font-size:24px}}
+@media(max-width:480px){.haru-board{padding:16px}.haru-board h2{font-size:17px}.haru-muted{font-size:12px;line-height:1.65}.haru-line{flex-wrap:wrap;gap:5px 12px}.haru-line b{flex:1;min-width:100px}.haru-actions{gap:7px}.haru-actions button{font-size:12px;padding:9px 11px}.haru-table{min-width:430px}.haru-table td,.haru-table th{font-size:12px;padding:11px 8px}}
