@@ -98,9 +98,7 @@
   Object.values(groups).forEach(g=>g.remaining=g.available-g.actual);
   if(model.reserveBudgetMode){groups.reserve.balance=Object.values(items).filter(i=>i.group==='reserve').reduce((n,i)=>n+i.balance,0);groups.reserve.remaining=groups.reserve.balance;}
   const sharedLimit=items.hobby.planned+items.shopping.planned,sharedUsed=items.hobby.actual+items.shopping.actual;
-  let bufferUsed=Math.max(0,sharedUsed-sharedLimit);
-  Object.values(items).filter(i=>i.group==='living'&&!['hobby','shopping','buffer'].includes(i.id)).forEach(i=>bufferUsed+=Math.max(0,i.actual-i.planned));
-  bufferUsed+=Math.max(0,items.buffer.actual);
+  const bufferUsed=items.buffer.actual;
   const totalPlanned=Object.values(groups).reduce((n,g)=>n+g.planned,0),netPlanned=plan.netIncome===null||plan.netIncome===undefined?null:cash(plan.netIncome);
   return {items,groups,plan,totalPlanned,netPlanned,grossIncome:cash(plan.grossIncome),income,spending,savingRate:income>0?groups.saving.actual/income:null,
    shortfall:netPlanned===null?null:Math.max(0,totalPlanned-netPlanned),unallocated:netPlanned===null?null:netPlanned-totalPlanned,

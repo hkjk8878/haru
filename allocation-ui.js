@@ -33,16 +33,16 @@ function allocationState(r){return r.plan?'예정':r.date>today()?'미래 날짜
 txRow=function(r){
  if(!S.allocation)return allocationLegacyTxRow(r);
  const c=allocationClass(r),color=ALLOC_GROUPS[c.group]?.color||'#34D399';
- const name=c.item?allocationName(c.item):mcatOf(r.catId).name||'분류 확인';
+ const name=c.item?allocationName(c.item):mcatOf(r.catId).name||'항목 미지정';
  const label=r.type==='transfer'?`${r.allocationFrom?allocationName(r.allocationFrom):'일반 계좌'} → ${c.item?name:'일반 계좌'}`:name;
- return `<button class="tx alloc-transaction" data-tx="${esc(txId(r.id))}"><span class="dot" style="background:${color}"></span><span class="m"><b>${esc(r.memo||label)}</b><small>${esc(label)}${allocationState(r)?' · '+allocationState(r):''}${r.instI?' · '+r.instI+'회차':''}</small></span><span class="v" style="color:${color}">${r.type==='in'?'+':r.type==='transfer'?'↔':c.kind==='saving'?'↓':'−'}${allocationMoney(r.amount)}</span></button>`;
+ return `<button class="tx alloc-transaction" data-tx="${esc(txId(r.id))}"><span class="dot" style="background:${color}"></span><span class="m"><b>${esc(r.memo||label)}</b><small>${esc(label)}${c.review?' · 항목 미지정':''}${allocationState(r)?' · '+allocationState(r):''}${r.instI?' · '+r.instI+'회차':''}</small></span><span class="v" style="color:${color}">${r.type==='in'?'+':r.type==='transfer'?'↔':c.kind==='saving'?'↓':'−'}${allocationMoney(r.amount)}</span></button>`;
 };
 function allocationItemRow(item,a){
- const actualLabel=item.id==='buffer'?'초과 흡수':item.group==='saving'?'납입':item.group==='reserve'?'사용':'사용';
+ const actualLabel=item.group==='saving'?'납입':'사용';
  const remaining=['hobby','shopping'].includes(item.id)?null:item.group==='reserve'?item.balance:item.remaining;
- const special=item.id==='buffer'?`완충 잔여 ${allocationMoney(a.buffer.remaining)}`:item.id==='etf'&&item.carry?`이월 ${allocationMoney(item.carry)}`:null;
+ const special=item.id==='etf'&&item.carry?`이월 ${allocationMoney(item.carry)}`:null;
  const balance=['marriage','emergency','gift','special','medical'].includes(item.id)?`잔액 ${allocationMoney(item.balance)}`:null;
- return `<div class="alloc-item"><div class="alloc-item-head"><button data-alloc="${item.id==='buffer'?'item-budget':'record-item'}" data-item="${item.id}">${esc(item.name)}</button><button data-alloc="item-budget" data-item="${item.id}" aria-label="${esc(item.name)} 예산·목표 수정">${item.group==='reserve'?'월 ':''}${allocationMoney(item.planned)}</button></div><div class="alloc-item-meta"><span>${actualLabel} ${allocationMoney(item.id==='buffer'?a.buffer.used:item.group==='reserve'?item.spent:item.actual)}</span><span class="${remaining<0?'haru-danger':''}">${special||balance||(remaining===null?'공동 한도 적용':'남음 '+allocationMoney(remaining))}</span></div>${item.id==='etf'&&item.carry?`<p class="haru-muted">사용 가능 ${allocationMoney(item.available)}</p>`:''}${item.id==='emergency'?`<div class="haru-progress"><i style="width:${Math.max(0,Math.min(100,item.balance/S.allocation.emergencyTarget*100))}%"></i></div><p class="haru-muted">목표 ${allocationMoney(S.allocation.emergencyTarget)}</p>`:''}</div>`;
+ return `<div class="alloc-item"><div class="alloc-item-head"><button data-alloc="record-item" data-item="${item.id}">${esc(item.name)}</button><button data-alloc="item-budget" data-item="${item.id}" aria-label="${esc(item.name)} 예산·목표 수정">${item.group==='reserve'?'월 ':''}${allocationMoney(item.planned)}</button></div><div class="alloc-item-meta"><span>${actualLabel} ${allocationMoney(item.group==='reserve'?item.spent:item.actual)}</span><span class="${remaining<0?'haru-danger':''}">${special||balance||(remaining===null?'공동 한도 적용':'남음 '+allocationMoney(remaining))}</span></div>${item.id==='etf'&&item.carry?`<p class="haru-muted">사용 가능 ${allocationMoney(item.available)}</p>`:''}${item.id==='emergency'?`<div class="haru-progress"><i style="width:${Math.max(0,Math.min(100,item.balance/S.allocation.emergencyTarget*100))}%"></i></div><p class="haru-muted">목표 ${allocationMoney(S.allocation.emergencyTarget)}</p>`:''}</div>`;
 }
 vMoney=function(){
  allocationInit();const a=allocationSnapshot(),p=ALLOC_GROUPS;
@@ -58,13 +58,11 @@ vMoney=function(){
   const v=a.groups[key];
   return `<details class="haru-board alloc-group" id="alloc-group-${key}" style="--alloc-color:${g.color}"><summary><span class="alloc-group-title"><b>${g.name}</b><span>${key==='saving'?'월 목표':key==='reserve'?'남은 예산':'월 예산'}</span></span><strong class="alloc-group-budget">${allocationMoney(key==='reserve'?v.remaining:v.planned)}</strong><span class="alloc-group-progress">${key==='reserve'?`<span>매달 추가 <b>${allocationMoney(v.planned)}</b></span>`:''}<span>${g.verb} <b>${allocationMoney(key==='reserve'?v.spent:v.actual)}</b></span>${key!=='reserve'?`<span class="${v.remaining<0?'haru-danger':''}">${v.remaining<0?'초과':'남음'} <b>${allocationMoney(Math.abs(v.remaining))}</b></span>`:''}</span></summary>
   <div class="alloc-items">${S.allocation.items.filter(i=>i.group===key).map(i=>allocationItemRow(a.items[i.id],a)).join('')}</div>
-  ${key==='living'?`<div class="alloc-callout">취미·쇼핑 공동 잔여 <b>${allocationMoney(a.shared.remaining)}</b><br>예비비 잔여 <b>${allocationMoney(a.buffer.remaining)}</b></div>`:''}
   ${key==='reserve'?`<div class="alloc-callout">매달 예산 자동 추가 · 남은 예산 이월<br>이번 달 실제 소비 <b>${allocationMoney(v.spent)}</b><br>남은 예산 <b>${allocationMoney(['gift','special','medical'].reduce((n,id)=>n+a.items[id].balance,0))}</b></div>`:''}
   ${key==='saving'&&a.achievedMonth?`<p class="haru-muted">비상금 목표 달성 · 다음 달부터 결혼자금 목표에 합산</p>`:''}</details>`;
  }).join('')}</div>
- ${a.review.length?`<div class="haru-actions"><button data-alloc="review">분류 확인 ${a.review.length}건</button></div>`:''}
  <details class="haru-board haru-fold" id="alloc-metrics"><summary>월 요약</summary><div class="alloc-income-pair"><span>실제 소비</span><b>${allocationMoney(a.spending)}</b></div><div class="alloc-income-pair"><span>저축·투자 / 실제 수입</span><b>${a.savingRate===null?'수입 기록 필요':(a.savingRate*100).toFixed(1)+'%'}</b></div><div class="haru-actions"><button data-alloc="csv">기록 CSV</button><button data-alloc="plan-csv">예산표 CSV</button><button data-alloc="openings">시작 잔액</button></div></details>
- <section class="card" id="alloc-records"><header><h2>${allocationRecordScope==='review'?'분류 확인':'전체 기록'}</h2><span class="count">${rows.length}건</span><button class="add" data-newtx="1">＋ 기록</button></header>${allocationRecordScope==='review'?'<button class="addbtn" data-alloc="all-records">전체 기록 보기</button>':''}
+ <section class="card" id="alloc-records"><header><h2>${allocationRecordScope==='review'?'항목 미지정':'전체 기록'}</h2><span class="count">${rows.length}건</span><button class="add" data-newtx="1">＋ 기록</button></header>${allocationRecordScope==='review'?'<button class="addbtn" data-alloc="all-records">전체 기록 보기</button>':''}
  ${rows.length?rows.map((r,i)=>`${!i||r.date!==rows[i-1].date?`<div class="daygrp"><span>${md(r.date)}</span></div>`:''}${txRow(r)}`).join(''):'<div class="empty">아직 기록이 없어요.</div>'}</section>`;
 };
 let allocationForm=null;
@@ -72,7 +70,7 @@ function allocationOptions(kind,group){
  if(kind==='income')return ALLOC_INCOMES.map(([id,name])=>({id,name}));
  if(kind==='transfer')return S.allocation.items.filter(i=>['marriage','emergency'].includes(i.id));
  if(kind==='saving')return S.allocation.items.filter(i=>i.group==='saving');
- return S.allocation.items.filter(i=>['fixed','living','reserve'].includes(i.group)&&i.id!=='buffer'&&(!group||i.group===group));
+ return S.allocation.items.filter(i=>['fixed','living','reserve'].includes(i.group)&&(!group||i.group===group));
 }
 function allocationRenderForm(){
  const f=allocationForm,options=allocationOptions(f.kind,f.group);
