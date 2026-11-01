@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v131';
+const APP_VER='v132';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1205,6 +1205,7 @@ const STORE=(()=>{
 })();
 let timer=null, saveFailed=false;
 function save(){
+  if(typeof haruSyncCapture==='function')haruSyncCapture();
   // Local writes are synchronous: navigation cannot cancel the last edit.
   if(STORE.mode()==='local'){
     try{localStorage.setItem(KEY,JSON.stringify(S));saveFailed=false;}
@@ -1234,6 +1235,7 @@ async function load(){
   haruCalendarInit();allocationInit();
   homeTab=(S.homeStart==='last'?(S.homeLast||'todo'):(S.homeStart||'todo'));
   haruConflict=await STORE.get(KEY+':conflict').then(x=>x?JSON.parse(x):null).catch(()=>null);
+  if(typeof haruSyncInit==='function'){try{await haruSyncInit();}catch(e){haruSyncSetStatus('기기 저장 공간 확인 필요 · 복구 자료를 먼저 내려받으세요');}}
   save(); render(); setInterval(tickNotify,20000); tickNotify();
   lastSyncJSON=S.sync.base||JSON.stringify(syncPayload());
   syncStart();
@@ -5309,6 +5311,8 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
 <script src="upgrade.js"></script>
 <script src="allocation.js"></script>
 <script src="allocation-ui.js"></script>
+<script src="sync-core.js"></script>
+<script src="sync-client.js"></script>
 <script>load();</script>
 </body>
 </html>

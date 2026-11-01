@@ -1,0 +1,21 @@
+{
+  "name": "haru-alarm",
+  "main": "worker.js",
+  "compatibility_date": "2026-08-31",
+  "workers_dev": true,
+  "keep_vars": true,
+  "kv_namespaces": [
+    {
+      "binding": "HARU",
+      "id": "01d2d35a8bef4831a15063c67516638d"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

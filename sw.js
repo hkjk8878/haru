@@ -1,11 +1,13 @@
 /* 하루 — 서비스워커
    앱 파일을 캐시해 두어 인터넷이 없어도 열리게 합니다.
    index.html을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요. */
-const VERSION = 'haru-v131';
+const VERSION = 'haru-v132';
 const FILES = [
   './',
   './index.html',
   './finance.js',
+  './sync-core.js',
+  './sync-client.js',
   './allocation.js',
   './allocation-ui.js',
   './allocation.css',
