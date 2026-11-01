@@ -125,8 +125,9 @@ function haruRecoveryRecords(){
  Object.entries(haruSyncRecovery).forEach(([key,value])=>visit(value,key));return [...found.values()];
 }
 haruConflictCard=function(){return '';};
+syncCard=function(){return '';};
 const haruSyncPreviousSettings=vSet;
-vSet=function(){const candidates=haruRecoveryRecords();return `<section class="haru-board"><h2>기기 동기화</h2><p id="haru-sync-status" role="status">${esc(haruSyncStatus)}</p><div class="haru-actions"><button data-sync2="now">지금 동기화</button><button data-sync2="recovery">복구 자료 내려받기</button></div>${candidates.length?`<p>보관 사본에서 11월 1일 기록 ${candidates.length}건을 찾았어요.</p><button class="addbtn" data-sync2="restore">누락된 11월 1일 기록 복원</button>`:''}</section>`+haruSyncPreviousSettings();};
+vSet=function(){const candidates=haruRecoveryRecords();return `<section class="haru-board"><h2>기기 동기화</h2><p id="haru-sync-status" role="status">${esc(haruSyncStatus)}</p><div class="haru-actions"><button data-syncsheet="1">연결 설정</button><button data-sync2="now">지금 동기화</button><button data-sync2="recovery">복구 자료 내려받기</button></div>${candidates.length?`<p>보관 사본에서 11월 1일 기록 ${candidates.length}건을 찾았어요.</p><button class="addbtn" data-sync2="restore">누락된 11월 1일 기록 복원</button>`:''}</section>`+haruSyncPreviousSettings();};
 document.addEventListener('click',async e=>{
  const b=e.target.closest('[data-sync2]');if(!b)return;
  if(b.dataset.sync2==='now')await haruSyncRun(false);
