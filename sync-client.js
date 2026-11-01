@@ -72,10 +72,13 @@ async function haruSyncRun(silent=true){
   if(!haruSyncState||haruSyncState.room!==room)await haruSyncInit();
   haruSyncCapture();haruSyncPersist();
   const acked=new Set(haruSyncState.acked||[]),pending=Object.values(haruSyncState.ops).filter(op=>!acked.has(op.id)).slice(0,25);
-  const response=await haruSyncRequest({ops:pending,known:Object.keys(haruSyncState.ops).filter(id=>acked.has(id))});
+  const response=await haruSyncRequest({ops:pending,cursor:haruSyncState.cursor||0});
   if(S.sync.room!==room)return false;
   // Capture edits made while the network request was in flight before applying its result.
-  haruSyncCapture();haruSyncState.seed=haruSyncState.seed||response.seed||{};
+  haruSyncCapture();
+  if(response.backend&&haruSyncState.backend!==response.backend){haruSyncState.acked=[];haruSyncState.cursor=0;haruSyncState.backend=response.backend;}
+  haruSyncState.cursor=response.cursor||haruSyncState.cursor||0;
+  haruSyncState.seed=haruSyncState.seed||response.seed||{};
   for(const op of response.ops||[]){HaruSyncCore.validate(op);haruSyncState.ops[op.id]=op;}
   haruSyncState.acked=[...new Set([...haruSyncState.acked,...(response.ops||[]).map(op=>op.id)])];
   haruSyncState.acked=[...new Set([...haruSyncState.acked,...(response.acked||[])])];

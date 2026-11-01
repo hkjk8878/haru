@@ -96,13 +96,43 @@ async function syncEndpoint(req,env){
  let body;try{body=JSON.parse(text);}catch(e){return json({error:'잘못된 요청'},400);}
  const room=String(body.room||'').trim();if(!/^[A-Za-z0-9._-]{4,40}$/.test(room))return json({error:'동기화 코드 형식 확인'},400);
  const ops=body.ops||[];if(!Array.isArray(ops)||ops.length>25)return json({error:'변경 개수 확인'},400);
- try{return json(await syncReadV2(env.HARU,room,ops,Array.isArray(body.known)?body.known:[]));}catch(e){return json({error:String(e.message||e)},400);}
+ try{return json(await syncReadD1(env.HARU,env.HARU_SYNC_DB,room,ops,body.cursor||0));}catch(e){return json({error:String(e.message||e)},400);}
 }
-async function syncKeepLegacy(kv,room,body,server){
+async function syncKeepLegacy(kv,room,body,server,db){
  const at=new Date().toISOString(),id=crypto.randomUUID().replace(/-/g,'');
  await kv.put('recovery:'+room+':'+at+':'+id,JSON.stringify({at,kind:'legacy-before-upload',server:server?.data||null,data:body.data}));
  if(server&&(server.rev||0)>(body.rev||0))return;
- {const changes=HaruSyncCore.diff(syncClean(server?.data),syncClean(body.data));if(changes.length)await syncReadV2(kv,room,[{id,actor:'legacy',clock:Date.now(),changes}]);}
+ {const changes=HaruSyncCore.diff(syncClean(server?.data),syncClean(body.data));if(changes.length&&db)await syncReadD1(kv,db,room,[{id,actor:'legacy',clock:Date.now(),changes}]);}
+}
+
+/* Durable journal in D1. KV is read only to migrate the legacy snapshot. */
+const syncDbReady=new WeakSet();
+async function syncReadD1(kv,db,room,ops=[],cursor=0){
+ if(!db)throw Error('동기화 서버를 준비하고 있어요. 기기 기록은 보관됩니다.');
+ if(!syncDbReady.has(db)){
+  await db.batch([
+   db.prepare('CREATE TABLE IF NOT EXISTS haru_sync_ops (seq INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, UNIQUE(room,id))'),
+   db.prepare('CREATE INDEX IF NOT EXISTS haru_sync_room_seq ON haru_sync_ops(room,seq)')
+  ]);syncDbReady.add(db);
+ }
+ const legacyRaw=await kv.get('data:'+room),writes=[];
+ if(legacyRaw){
+  const legacy=JSON.parse(legacyRaw),clean=syncClean(legacy.data),digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(clean)));
+  const hash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  const id='seed_'+String(legacy.rev||0)+'_'+hash.slice(0,24),changes=HaruSyncCore.diff({},clean);
+  if(changes.length&&!await db.prepare('SELECT id FROM haru_sync_ops WHERE room=? AND id=?').bind(room,id).first()){
+   writes.push(db.prepare('INSERT OR IGNORE INTO haru_sync_ops(room,id,payload) VALUES(?,?,?)').bind(room,id,JSON.stringify({id,actor:'seed_'+String(legacy.rev||0).padStart(16,'0'),clock:0,changes})));
+  }
+ }
+ for(const op of ops){
+  HaruSyncCore.validate(op);const value=JSON.stringify(op),old=await db.prepare('SELECT payload FROM haru_sync_ops WHERE room=? AND id=?').bind(room,op.id).first();
+  if(old&&old.payload!==value)throw Error('동일한 변경 번호에 다른 내용이 있어요');
+  if(!old)writes.push(db.prepare('INSERT OR IGNORE INTO haru_sync_ops(room,id,payload) VALUES(?,?,?)').bind(room,op.id,value));
+ }
+ if(writes.length)await db.batch(writes);
+ const rows=(await db.prepare('SELECT seq,payload FROM haru_sync_ops WHERE room=? AND seq>? ORDER BY seq LIMIT 101').bind(room,Number.isSafeInteger(cursor)&&cursor>=0?cursor:0).all()).results;
+ const selected=rows.slice(0,100),hasData=selected.length>0||!!await db.prepare('SELECT seq FROM haru_sync_ops WHERE room=? LIMIT 1').bind(room).first();
+ return {ok:true,protocol:2,backend:'d1',seed:{},hasData,ops:selected.map(row=>JSON.parse(row.payload)),acked:ops.map(op=>op.id),cursor:selected.at(-1)?.seq||cursor,more:rows.length>100,at:new Date().toISOString()};
 }
 
 const TE = new TextEncoder();
@@ -276,6 +306,8 @@ export default {
         ok,
         haru: '알림 서버가 살아 있어요',
         syncProtocol: 2,
+        syncStorage: 'd1',
+        syncReady: !!env.HARU_SYNC_DB,
         설정: {
           공개열쇠: !!env.VAPID_PUBLIC,
           비밀열쇠: !!env.VAPID_JWK,
@@ -311,7 +343,7 @@ export default {
         return json({ ok: true, data: server ? server.data : null, rev: server ? server.rev : 0 });
       }
 
-      await syncKeepLegacy(env.HARU, room, b, server);
+      await syncKeepLegacy(env.HARU, room, b, server, env.HARU_SYNC_DB);
 
       const myRev = typeof b.rev === 'number' ? b.rev : 0;
       const svRev = server ? server.rev : 0;

@@ -17,5 +17,12 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "HARU_SYNC_DB",
+      "database_name": "haru-sync",
+      "database_id": "363322a7-fc00-4d48-b141-c88c6fb82ddb"
+    }
+  ]
 }

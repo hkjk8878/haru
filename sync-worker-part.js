@@ -33,11 +33,11 @@ async function syncEndpoint(req,env){
  let body;try{body=JSON.parse(text);}catch(e){return json({error:'잘못된 요청'},400);}
  const room=String(body.room||'').trim();if(!/^[A-Za-z0-9._-]{4,40}$/.test(room))return json({error:'동기화 코드 형식 확인'},400);
  const ops=body.ops||[];if(!Array.isArray(ops)||ops.length>25)return json({error:'변경 개수 확인'},400);
- try{return json(await syncReadV2(env.HARU,room,ops,Array.isArray(body.known)?body.known:[]));}catch(e){return json({error:String(e.message||e)},400);}
+ try{return json(await syncReadD1(env.HARU,env.HARU_SYNC_DB,room,ops,body.cursor||0));}catch(e){return json({error:String(e.message||e)},400);}
 }
-async function syncKeepLegacy(kv,room,body,server){
+async function syncKeepLegacy(kv,room,body,server,db){
  const at=new Date().toISOString(),id=crypto.randomUUID().replace(/-/g,'');
  await kv.put('recovery:'+room+':'+at+':'+id,JSON.stringify({at,kind:'legacy-before-upload',server:server?.data||null,data:body.data}));
  if(server&&(server.rev||0)>(body.rev||0))return;
- {const changes=HaruSyncCore.diff(syncClean(server?.data),syncClean(body.data));if(changes.length)await syncReadV2(kv,room,[{id,actor:'legacy',clock:Date.now(),changes}]);}
+ {const changes=HaruSyncCore.diff(syncClean(server?.data),syncClean(body.data));if(changes.length&&db)await syncReadD1(kv,db,room,[{id,actor:'legacy',clock:Date.now(),changes}]);}
 }
