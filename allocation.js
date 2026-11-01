@@ -17,10 +17,21 @@
   return {version:1,start:ym,openingDate:date,excludedOpeningIds:[...existingIds],items:definitions.map(([id,name,group])=>({id,name,group})),
    plans:{[ym]:{grossIncome:2000000,netIncome:null,amounts}},openings:{emergency:490000,marriage:0,gift:0,special:0,medical:0},emergencyTarget:2500000,autoReallocate:true};
  }
- function planFor(model,ym){
+ function planFor(model,ym,includeOverride=true){
   const key=Object.keys(model.plans).filter(k=>k<=ym).sort().at(-1);
-  if(!key)return {grossIncome:0,netIncome:null,amounts:Object.fromEntries(model.items.map(i=>[i.id,0])),uninitialized:true};
-  return copy(model.plans[key]);
+  if(!key)return {grossIncome:0,netIncome:null,amounts:{...Object.fromEntries(model.items.map(i=>[i.id,0])),...(includeOverride?model.monthOverrides?.[ym]||{}:{})},uninitialized:true};
+  const p=copy(model.plans[key]);if(includeOverride)Object.assign(p.amounts,model.monthOverrides?.[ym]||{});return p;
+ }
+ function saveBudget(model,ym,amounts,scope){
+  if(scope!=='month'&&scope!=='ongoing')throw new Error('Invalid budget scope');
+  for(const [id,value] of Object.entries(amounts))if(!model.items.some(i=>i.id===id)||!Number.isSafeInteger(value)||value<0)throw new Error('Invalid budget');
+  model.monthOverrides=model.monthOverrides||{};
+  if(scope==='month')model.monthOverrides[ym]={...(model.monthOverrides[ym]||{}),...amounts};
+  else{
+   const p=planFor(model,ym,false);delete p.uninitialized;Object.assign(p.amounts,amounts);model.plans[ym]=p;
+   for(const id of Object.keys(amounts))if(model.monthOverrides[ym])delete model.monthOverrides[ym][id];
+  }
+  if(ym<model.start)model.start=ym;
  }
  function aliasItem(name){return Object.keys(aliases).find(id=>aliases[id].includes(String(name||'').trim()))||null;}
  function classify(r,model,cats=[],fixed=[]){
@@ -105,6 +116,6 @@
    shared:{limit:sharedLimit,used:sharedUsed,remaining:sharedLimit-sharedUsed},buffer:{limit:items.buffer.planned,used:bufferUsed,remaining:items.buffer.planned-bufferUsed},
    review:[...new Set(review)],achievedMonth:achieved,cutoff};
  }
- const api={definitions,aliases,createModel,planFor,aliasItem,classify,rowsForMonth,snapshot};
+ const api={definitions,aliases,createModel,planFor,saveBudget,aliasItem,classify,rowsForMonth,snapshot};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.HaruAllocation=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

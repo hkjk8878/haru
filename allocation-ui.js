@@ -99,10 +99,11 @@ txSheet=function(id){
  if(!r&&!allocationOptions(kind,group).some(i=>i.id===item))allocationForm.item=allocationOptions(kind,group)[0]?.id||'';
  allocationRenderForm();
 };
+function allocationScopeField(){return '<div class="field"><label for="alloc-budget-scope">적용 기간</label><select id="alloc-budget-scope"><option value="month">이번 달만</option><option value="ongoing">앞으로 계속</option></select></div>';}
 function allocationPlanSheet(itemId){
  const a=allocationSnapshot(),plan=HaruAllocation.planFor(S.allocation,moneyMonth);
- if(itemId){const item=a.items[itemId];openSheet(`<h2>${esc(item.name)} 예산·목표</h2><p class="hint">${moneyMonth}부터 적용</p><p class="err" id="err"></p><div class="field"><label for="alloc-item-amount">월 예산·목표</label><input id="alloc-item-amount" type="number" inputmode="numeric" min="0" value="${plan.amounts[itemId]||0}"></div><div class="actions"><button class="cancel" data-close="1">취소</button><button class="save" data-alloc="save-item-budget" data-item="${itemId}">저장</button></div>`);return;}
- openSheet(`<h2>예산·목표 수정</h2><p class="hint">${moneyMonth}부터 적용 · 수입이 바뀌어도 유지돼요.</p><p class="err" id="err"></p>${Object.entries(ALLOC_GROUPS).map(([g,v])=>`<h3 class="alloc-plan-heading">${v.name}</h3>${S.allocation.items.filter(i=>i.group===g).map(i=>`<div class="alloc-plan-row"><label for="plan-${i.id}">${esc(i.name)}</label><input id="plan-${i.id}" data-plan-item="${i.id}" type="number" inputmode="numeric" min="0" value="${plan.amounts[i.id]||0}"></div>`).join('')}`).join('')}<p class="alloc-plan-total" id="alloc-plan-total">예산·목표 합계 ${allocationMoney(a.totalPlanned)}</p><div class="actions"><button class="cancel" data-close="1">취소</button><button class="save" data-alloc="save-plan">저장</button></div>`);
+ if(itemId){const item=a.items[itemId];openSheet(`<h2>${esc(item.name)} 예산·목표</h2><p class="hint">${moneyMonth} 예산</p><p class="err" id="err"></p><div class="field"><label for="alloc-item-amount">월 예산·목표</label><input id="alloc-item-amount" type="number" inputmode="numeric" min="0" value="${plan.amounts[itemId]||0}"></div>${allocationScopeField()}<div class="actions"><button class="cancel" data-close="1">취소</button><button class="save" data-alloc="save-item-budget" data-item="${itemId}">저장</button></div>`);return;}
+ openSheet(`<h2>예산·목표 수정</h2><p class="hint">${moneyMonth} · 항목별 금액을 조정한 뒤 적용 기간을 선택하세요.</p><p class="err" id="err"></p>${Object.entries(ALLOC_GROUPS).map(([g,v])=>`<h3 class="alloc-plan-heading">${v.name}</h3>${S.allocation.items.filter(i=>i.group===g).map(i=>`<div class="alloc-plan-row"><label for="plan-${i.id}">${esc(i.name)}</label><input id="plan-${i.id}" data-plan-item="${i.id}" type="number" inputmode="numeric" min="0" value="${plan.amounts[i.id]||0}"></div>`).join('')}`).join('')}<p class="alloc-plan-total" id="alloc-plan-total">예산·목표 합계 ${allocationMoney(a.totalPlanned)}</p>${allocationScopeField()}<div class="actions"><button class="cancel" data-close="1">취소</button><button class="save" data-alloc="save-plan">저장</button></div>`);
 }
 function allocationOpeningSheet(){
  const m=S.allocation;
@@ -143,13 +144,14 @@ document.addEventListener('click',async e=>{
   const plan=HaruAllocation.planFor(S.allocation,moneyMonth);
   const inputs=[...document.querySelectorAll('[data-plan-item]')];
   if(inputs.some(i=>!allocationValidNumber(i.value)))return showErr('0 이상의 금액을 입력해 주세요.');
-  delete plan.uninitialized;plan.amounts=Object.fromEntries(inputs.map(i=>[i.dataset.planItem,Math.round(+i.value)]));S.allocation.plans[moneyMonth]=plan;
-  if(moneyMonth<S.allocation.start)S.allocation.start=moneyMonth;
+  const scope=document.getElementById('alloc-budget-scope').value;
+  const amounts=Object.fromEntries(inputs.filter(i=>Math.round(+i.value)!==(plan.amounts[i.dataset.planItem]||0)||(scope==='ongoing'&&Object.hasOwn(S.allocation.monthOverrides?.[moneyMonth]||{},i.dataset.planItem))).map(i=>[i.dataset.planItem,Math.round(+i.value)]));
+  HaruAllocation.saveBudget(S.allocation,moneyMonth,amounts,scope);
   save();closeSheet();render();toast('예산·목표를 저장했어요');
  }
  if(action==='save-item-budget'){
   const value=document.getElementById('alloc-item-amount').value;if(!allocationValidNumber(value))return showErr('0 이상의 금액을 입력해 주세요.');
-  const p=HaruAllocation.planFor(S.allocation,moneyMonth);p.amounts[d.item]=Math.round(+value);delete p.uninitialized;S.allocation.plans[moneyMonth]=p;if(moneyMonth<S.allocation.start)S.allocation.start=moneyMonth;save();closeSheet();render();
+  HaruAllocation.saveBudget(S.allocation,moneyMonth,{[d.item]:Math.round(+value)},document.getElementById('alloc-budget-scope').value);save();closeSheet();render();
  }
  if(action==='save-openings'){
   const ids=['emergency','marriage','gift','special','medical'],target=document.getElementById('alloc-target').value;
