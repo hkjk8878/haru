@@ -33,6 +33,23 @@
   }
   if(ym<model.start)model.start=ym;
  }
+ function distributeBudget(total,amounts,retained=[]){
+  if(!Number.isSafeInteger(total)||total<0)throw new Error('전체 예산은 0 이상의 정수로 입력해 주세요.');
+  const entries=Object.entries(amounts),locks=new Set(retained),out={};
+  if(entries.some(([,v])=>!Number.isSafeInteger(v)||v<0))throw new Error('항목별 예산을 확인해 주세요.');
+  const fixed=entries.filter(([id])=>locks.has(id)).reduce((n,[,v])=>n+BigInt(v),0n),rest=BigInt(total)-fixed;
+  if(rest<0n)throw new Error('유지할 금액이 전체 예산보다 커요. 전체 예산이나 유지할 금액을 조정해 주세요.');
+  const free=entries.filter(([id])=>!locks.has(id));
+  if(!free.length&&rest>0n)throw new Error('모든 항목이 금액 유지 중이에요. 나눠 넣을 항목의 유지를 해제해 주세요.');
+  entries.forEach(([id,v])=>out[id]=locks.has(id)?v:0);
+  if(!free.length)return out;
+  const sum=free.reduce((n,[,v])=>n+BigInt(v),0n),den=sum||BigInt(free.length);
+  const shares=free.map(([id,v],index)=>{const numerator=rest*(sum?BigInt(v):1n);out[id]=Number(numerator/den);return {id,index,remainder:numerator%den};});
+  let left=Number(rest-free.reduce((n,[id])=>n+BigInt(out[id]),0n));
+  shares.sort((a,b)=>a.remainder===b.remainder?a.index-b.index:a.remainder>b.remainder?-1:1);
+  for(let i=0;i<left;i++)out[shares[i].id]++;
+  return out;
+ }
  function aliasItem(name){return Object.keys(aliases).find(id=>aliases[id].includes(String(name||'').trim()))||null;}
  function classify(r,model,cats=[],fixed=[]){
   const cat=cats.find(c=>c.id===r.catId)||{},fx=r.fx?fixed.find(f=>f.id===String(r.fx).split(':')[0]):null;
@@ -116,6 +133,6 @@
    shared:{limit:sharedLimit,used:sharedUsed,remaining:sharedLimit-sharedUsed},buffer:{limit:items.buffer.planned,used:bufferUsed,remaining:items.buffer.planned-bufferUsed},
    review:[...new Set(review)],achievedMonth:achieved,cutoff};
  }
- const api={definitions,aliases,createModel,planFor,saveBudget,aliasItem,classify,rowsForMonth,snapshot};
+ const api={definitions,aliases,createModel,planFor,saveBudget,distributeBudget,aliasItem,classify,rowsForMonth,snapshot};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.HaruAllocation=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
