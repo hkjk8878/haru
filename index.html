@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v136';
+const APP_VER='v137';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -5264,7 +5264,7 @@ window.addEventListener('beforeinstallprompt',e=>{
 window.addEventListener('appinstalled',()=>{installEvt=null;if(S)render()});
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{});
   });
 }
 </script>

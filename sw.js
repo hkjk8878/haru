@@ -1,7 +1,7 @@
 /* 하루 — 서비스워커
    앱 파일을 캐시해 두어 인터넷이 없어도 열리게 합니다.
    index.html을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요. */
-const VERSION = 'haru-v136';
+const VERSION = 'haru-v137';
 const FILES = [
   './',
   './index.html',
@@ -25,9 +25,8 @@ const FILES = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(VERSION)
-      .then(c => c.addAll(FILES))
+      .then(c => c.addAll(FILES.map(url => new Request(new URL(url, self.registration.scope), {cache:'reload'}))))
       .then(() => self.skipWaiting())
-      .catch(() => {})
   );
 });
 
@@ -48,29 +47,18 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
 
   const isPage = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
-
-  if (isPage) {
-    e.respondWith(
-      fetch(req)
-        .then(res => {
-          caches.open(VERSION).then(c => c.put(req, res.clone())).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
-    );
-    return;
-  }
-
-  /* 자산도 네트워크를 먼저 시도해 새 파일이 바로 반영되게 한다.
-     실패(오프라인)하면 캐시에서 꺼낸다. */
-  e.respondWith(
-    fetch(req)
-      .then(res => {
-        caches.open(VERSION).then(c => c.put(req, res.clone())).catch(() => {});
-        return res;
-      })
-      .catch(() => caches.match(req))
-  );
+  e.respondWith((async () => {
+    const cache = await caches.open(VERSION);
+    try {
+      const res = await fetch(req, {cache:'reload'});
+      if(res.ok) await cache.put(req, res.clone()).catch(() => {});
+      return res;
+    } catch (error) {
+      const saved = await cache.match(req) || (isPage && await cache.match('./index.html'));
+      if(saved) return saved;
+      throw error;
+    }
+  })());
 });
 
 /* ── 푸시 알림 ── */
