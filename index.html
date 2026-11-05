@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v137';
+const APP_VER='v138';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2742,6 +2742,17 @@ const cfMoney=()=>calFilter==='all'||calFilter==='money'||!!(curCV()&&curCV().mo
 const cfGoal=()=>calFilter==='all'||calFilter==='goal'||!!(curCV()&&curCV().goal);
 const evShown=d=>{const cs=cfEvCats();return eventsOn(d).filter(e=>cs===null||cs.indexOf(e.catId)>=0)};
 const fixOn=d=>fixedOf(monthOf(d)).filter(f=>fixDay(f,d));
+function calendarFixedRecord(f,date){
+  const key=f.id+':'+monthOf(date);
+  return S.money.find(record=>record.fx===key&&!record.plan);
+}
+function fixedSavingsGoal(f,ym){
+  if(f.type==='in'||!S.allocation)return null;
+  const id=HaruAllocation.aliasItem(f.name);
+  if(id!=='marriage'&&id!=='emergency')return null;
+  const plan=HaruAllocation.planFor(S.allocation,ym);
+  return !plan.uninitialized&&Number.isFinite(plan.amounts[id])?{id,amount:plan.amounts[id]}:null;
+}
 function calFilterBar(){
   const filters=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표'],['work','일'],['personal','개인']];
   const selected=calFilter.startsWith('ev:')?ecatOf(calFilter.slice(3)):null;
@@ -2823,13 +2834,15 @@ function vCal(){
         ?'<div class="empty">이 날은 비어 있어요.</div>':''}
       ${cfMoney()?fixOn(view).map(f=>{
         const c=mcatOf(f.catId);
-        const done=S.money.some(m=>m.fx===f.id+':'+monthOf(view));
+        const record=calendarFixedRecord(f,view);
+        const goal=fixedSavingsGoal(f,monthOf(view));
+        const amount=record?.amount??goal?.amount??fixAmt(f,monthOf(view));
         const fcl=MC.fix;
         return `<div class="ev" style="border-left-color:${fcl}">
           <span class="tm" style="color:${fcl}">고정 ${f.type==='in'?'수입':'지출'}</span>
           <span class="bd"><b style="font-weight:600">${esc(f.name)}</b>
-            <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(fixAmt(f,monthOf(view)))}${done?' · 기록됨':''}</small></span>
-          ${done?'':`<button class="fadd" data-addfix="${f.id}">넣기</button>`}</div>`;
+            <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(amount)}${record?' · 기록됨':''}</small></span>
+          ${record?`<button class="fadd" data-tx="${esc(record.id)}">수정</button>`:`<button class="fadd" data-editfix="${esc(f.id)}" data-fix-month="${monthOf(view)}">${goal?'목표 수정':'수정'}</button>${amount>0?`<button class="fadd" data-addfix="${esc(f.id)}" data-fix-month="${monthOf(view)}">넣기</button>`:''}`}</div>`;
       }).join(''):''}
       ${cfMoney()?moneyOn(view).filter(x=>x.type==='transfer'&&!x.plan).map(txRow).join(''):''}
       ${cfMoney()?planOnly(moneyOn(view)).map(x=>{
@@ -2839,7 +2852,7 @@ function vCal(){
           <span class="tm" style="color:${cl}">예정 ${x.type==='transfer'?'이체':x.type==='in'?'수입':(c.sv?'저축':'지출')}</span>
           <span class="bd"><b style="font-weight:600">${esc(x.memo||c.name)}${x.notify?' 🔔':''}</b>
             <small>${esc(c.name)}${x.time?' · '+x.time:''} · ${won(x.amount)}</small></span>
-          <button class="fadd" data-planok="${x.id}">완료</button></div>`;
+          <button class="fadd" data-tx="${esc(x.id)}">수정</button><button class="fadd" data-planok="${x.id}">완료</button></div>`;
       }).join(''):''}
       ${cfMoney()?moneyOn(view).filter(v=>!v.plan&&v.type!=='transfer').map(mm=>{
         const c=mcatOf(mm.catId);
@@ -4804,7 +4817,15 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.newfix){fixSheet(null);return}
-  if(d.editfix){fixSheet(d.editfix);return}
+  if(d.editfix){
+    if(d.fixMonth){
+      moneyMonth=d.fixMonth;
+      const fixed=(S.fixed||[]).find(item=>item.id===d.editfix);
+      const goal=fixed&&fixedSavingsGoal(fixed,moneyMonth);
+      if(goal){allocationPlanSheet(goal.id);return}
+    }
+    fixSheet(d.editfix);return
+  }
   if(d.savefix!==undefined){
     const nm=$('#f-fname').value.trim();
     const amt=Math.round(+$('#f-famt').value||0);
@@ -4886,7 +4907,7 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.addfix||d.addallfix){
-    const ym=moneyMonth;
+    const ym=d.fixMonth||moneyMonth;
     const list=d.addfix?(S.fixed||[]).filter(f=>f.id===d.addfix):(S.fixed||[]);
     let n=0;
     list.forEach(f=>{
@@ -4894,8 +4915,10 @@ document.addEventListener('click',ev=>{
       if(S.money.some(m=>m.fx===key)) return;
       if(!fixActive(f,ym)) return;
       const dd=Math.min(fixDayOf(f,ym),daysIn(ym));
+      const amount=fixedSavingsGoal(f,ym)?.amount??fixAmt(f,ym);
+      if(!(amount>0))return;
       S.money.push({id:uid(),date:`${ym}-${pad(dd)}`,type:f.type||'out',catId:f.catId,
-        amount:fixAmt(f,ym),memo:f.name,fx:key});
+        amount,memo:f.name,fx:key});
       n++;
     });
     save();render();
