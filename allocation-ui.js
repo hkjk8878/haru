@@ -41,8 +41,8 @@ function allocationItemRow(item,a){
  const actualLabel=item.group==='saving'?'이번 달 납입':'사용';
  const remaining=['hobby','shopping'].includes(item.id)?null:item.group==='reserve'?item.balance:item.remaining;
 
- const balance=['marriage','emergency','gift','special','medical'].includes(item.id)?`잔액 ${allocationMoney(item.balance)}`:null;
- return `<div class="alloc-item"><div class="alloc-item-head"><button data-alloc="record-item" data-item="${item.id}">${esc(item.name)}</button><button data-alloc="item-budget" data-item="${item.id}" aria-label="${esc(item.name)} 예산·목표 수정">${item.group==='reserve'?'월 ':''}${allocationMoney(item.planned)}</button></div><div class="alloc-item-meta"><span>${actualLabel} ${allocationMoney(item.group==='reserve'?item.spent:item.actual)}</span><span class="${remaining<0?'haru-danger':''}">${balance||(item.group==='saving'?'':remaining===null?'공동 한도 적용':'남음 '+allocationMoney(remaining))}</span></div>${item.id==='emergency'?`<div class="haru-progress"><i style="width:${Math.max(0,Math.min(100,item.balance/S.allocation.emergencyTarget*100))}%"></i></div><p class="haru-muted">목표 ${allocationMoney(S.allocation.emergencyTarget)}</p>`:''}</div>`;
+ const balance=item.group==='reserve'?`잔액 ${allocationMoney(item.balance)}`:null;
+ return `<div class="alloc-item"><div class="alloc-item-head"><button data-alloc="record-item" data-item="${item.id}">${esc(item.name)}</button><button data-alloc="item-budget" data-item="${item.id}" aria-label="${esc(item.name)} 예산·목표 수정">${item.group==='reserve'?'월 ':''}${allocationMoney(item.planned)}</button></div><div class="alloc-item-meta"><span>${actualLabel} ${allocationMoney(item.group==='reserve'?item.spent:item.actual)}</span><span class="${remaining<0?'haru-danger':''}">${balance||(item.group==='saving'?'':remaining===null?'공동 한도 적용':'남음 '+allocationMoney(remaining))}</span></div></div>`;
 }
 vMoney=function(){
  allocationInit();const a=allocationSnapshot(),p=ALLOC_GROUPS;
