@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v139';
+const APP_VER='v140';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2749,11 +2749,17 @@ function calendarFixedRecord(f,date){
 function fixedBudgetItem(f,ym){
   if(f.type==='in'||!S.allocation)return null;
   const category=mcatOf(f.catId);
-  const id=HaruAllocation.aliasItem(f.name)||category.allocationItem||HaruAllocation.aliasItem(category.name);
-  const item=S.allocation.items.find(item=>item.id===id);
-  if(!item||!['saving','reserve'].includes(item.group))return null;
+  const name=f.name.replace(/\s*[（(][^()（）]*[)）]\s*$/,'').trim();
+  const id=HaruAllocation.aliasItem(f.name)||HaruAllocation.aliasItem(name)||category.allocationItem||HaruAllocation.aliasItem(category.name);
   const plan=HaruAllocation.planFor(S.allocation,ym);
-  return !plan.uninitialized&&Number.isFinite(plan.amounts[id])?{id,amount:plan.amounts[id]}:null;
+  if(plan.uninitialized)return null;
+  if(!id&&name==='비정기지출'){
+    const amount=S.allocation.items.filter(item=>item.group==='reserve').reduce((total,item)=>total+(plan.amounts[item.id]||0),0);
+    return {amount};
+  }
+  const item=S.allocation.items.find(item=>item.id===id);
+  if(!item)return null;
+  return Number.isFinite(plan.amounts[id])?{id,amount:plan.amounts[id]}:null;
 }
 function calFilterBar(){
   const filters=[['all','전체'],['todo','할 일'],['money','가계부'],['goal','목표'],['work','일'],['personal','개인']];
