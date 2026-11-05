@@ -1,7 +1,7 @@
 /* v123: existing screens share the same data, storage and backup format. */
 let haruConflict=null;
 const haruOriginalHeader=header, haruOriginalDday=ddayStrip, haruOriginalMoney=vMoney;
-const haruOriginalSet=vSet, haruOriginalTodo=tabTodo, haruOriginalTodoSheet=todoSheet;
+const haruOriginalSet=vSet;
 const haruOriginalMcat=mcatSheet, haruOriginalRender=render;
 const haruOriginalCalendar=vCal;
 const haruOriginalOpenSheet=openSheet,haruOriginalCloseSheet=closeSheet;
@@ -113,14 +113,23 @@ vMoney=function(){
 
 mcatSheet=function(id){haruOriginalMcat(id);const c=S.mcats.find(x=>x.id===id);const box=document.getElementById('outBox');if(box)box.insertAdjacentHTML('beforeend',`<div class="field"><label for="haru-kind">소비 성격</label><select id="haru-kind">${Object.entries(haruKinds).map(([v,n])=>`<option value="${v}" ${(c?.spendKind||'unset')===v?'selected':''}>${n}</option>`).join('')}</select><p class="tip">‘조절 가능’으로 지정한 소비에서만 절약 후보를 골라요.</p></div>`);};
 vSet=function(){return `<section class="haru-board"><h2>나에게 맞는 첫 화면</h2><div class="haru-settings"><label for="haru-home">앱을 열었을 때</label><select id="haru-home">${[['todo','할 일 먼저'],['routine','루틴 먼저'],['last','마지막으로 본 오늘 화면']].map(([v,n])=>`<option value="${v}" ${(S.homeStart||'todo')===v?'selected':''}>${n}</option>`).join('')}</select></div><div class="haru-actions"><button data-haru="summary">${S.homeSummary===false?'목표·연간 진행률 접기':'목표·연간 진행률 항상 펼치기'}</button></div></section>${haruConflictCard()}${haruOriginalSet()}`;};
-tabTodo=function(){
-  const held=S.todos.filter(t=>t.held&&!t.done);
-  return `<div class="haru-actions"><button data-haru="organize">미완료·보류 정리${held.length?' · 보류 '+held.length+'개':''}</button></div>${haruOriginalTodo()}`;
-};
-todoSheet=function(id){haruOriginalTodoSheet(id);const t=S.todos.find(x=>x.id===id);if(!t)return;document.getElementById('sheet').insertAdjacentHTML('beforeend',`<div class="haru-actions"><button data-haru="task-today" data-id="${esc(id)}">오늘</button><button data-haru="task-week" data-id="${esc(id)}">이번 주</button><button data-haru="task-hold" data-id="${esc(id)}">보류</button></div>`);};
-function haruOrganize(){
-  const ts=S.todos.filter(t=>!t.done&&(t.held||t.date<=today()||t.wk));
-  openSheet(`<h2>한꺼번에 밀리지 않도록</h2><p class="hint">오늘 할 것만 골라 오세요. 보류는 삭제나 완료가 아닙니다.</p>${ts.map(t=>`<div class="haru-task"><p>${esc(t.title)}</p><small>${t.held?'보류':t.wk?'주간':esc(t.date)}</small><div class="haru-actions">${[['today','오늘'],['week','이번 주'],['hold','보류']].map(([v,n])=>`<button data-haru="task-${v}" data-organize="1" data-id="${esc(t.id)}">${n}</button>`).join('')}</div></div>`).join('')||'<p>정리할 미완료 항목이 없어요.</p>'}<button class="cancel" data-close="1">닫기</button>`);
+function haruPastTodos(){
+  const day=today(), week=monStart(day);
+  return S.todos.filter(t=>!t.done&&(t.held||(t.date?t.date<day:t.wk&&t.wk<week)))
+    .sort((a,b)=>(a.date||a.wk||'').localeCompare(b.date||b.wk||''));
+}
+let haruPastLimit=20, haruPastScroll=0;
+function haruOrganize(scroll=0){
+  const tasks=haruPastTodos();
+  openSheet(`<h2>지난 할 일 ${tasks.length}개</h2><p class="hint">오래된 순서로 보여요. 필요한 일은 옮기고, 더 이상 필요 없는 일은 삭제하세요.</p>
+    ${tasks.slice(0,haruPastLimit).map(t=>{
+      const date=t.date||t.wk;
+      return `<div class="haru-task"><p>${esc(t.title)}</p><small>${date?esc(date)+(t.date?'':' 시작 주'):'날짜 없음'}</small>
+        <div class="haru-actions">${[['today','오늘로'],['date','날짜 선택'],['delete','삭제']].map(([action,label])=>
+          `<button data-haru="task-${action}" data-id="${esc(t.id)}">${label}</button>`).join('')}</div></div>`;
+    }).join('')||'<p>정리할 지난 할 일이 없어요.</p>'}
+    <div class="haru-actions">${tasks.length>haruPastLimit?'<button data-haru="task-more">20개 더 보기</button>':''}<button data-close="1">닫기</button></div>`);
+  document.getElementById('sheet').scrollTop=scroll;
 }
 async function haruHoldConflict(j){
   const snapshot={local:JSON.parse(JSON.stringify(syncPayload())),server:j.data,rev:j.rev||0,at:new Date().toISOString(),room:S.sync.room};
@@ -139,7 +148,7 @@ document.addEventListener('change',e=>{if(e.target.id==='haru-home'){S.homeStart
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-haru]');if(!b)return;const action=b.dataset.haru;
   if(action==='summary'){S.homeSummary=S.homeSummary===false;save();render();}
-  if(action==='organize')haruOrganize();
+  if(action==='organize'){haruPastLimit=20;haruPastScroll=0;haruOrganize();}
   if(action==='goal')haruGoalSheet();
   if(action==='goal-save'){
     const input=document.getElementById('haru-goal-limit'),n=Number(input.value);
@@ -147,10 +156,28 @@ document.addEventListener('click',async e=>{
     S.moneyGoals||={};S.moneyGoals[monStart(today())]={catId:document.getElementById('haru-goal-cat').value,limit:Math.round(n)};save();closeSheet();render();
   }
   if(action.startsWith('task-')){
-    const t=S.todos.find(x=>x.id===b.dataset.id);if(!t)return;
-    if(t.done&&action==='task-hold'){toast('완료한 일은 완료 체크를 해제한 뒤 보류해 주세요.');return;}
-    t.held=action==='task-hold';t.date=action==='task-today'?today():'';t.wk=action==='task-week'?monStart(today()):'';t.time='';t.notify='';
-    save();render();if(b.dataset.organize)haruOrganize();else closeSheet();
+    const scroll=document.getElementById('sheet').scrollTop;
+    if(action==='task-more'){haruPastLimit+=20;haruOrganize(scroll);return;}
+    if(action==='task-back'){haruOrganize(haruPastScroll);return;}
+    const t=haruPastTodos().find(x=>x.id===b.dataset.id);if(!t)return;
+    if(action==='task-date'){
+      haruPastScroll=scroll;
+      openSheet(`<h2>날짜 선택</h2><p class="hint">${esc(t.title)}</p><p class="err" id="err"></p>
+        <div class="field"><label for="haru-task-date">옮길 날짜</label><input id="haru-task-date" type="date" value="${today()}"></div>
+        <div class="actions"><button class="cancel" data-haru="task-back">뒤로</button><button class="save" data-haru="task-move" data-id="${esc(t.id)}">옮기기</button></div>`);
+      return;
+    }
+    if(action==='task-delete'){
+      if(!confirm('이 할 일을 삭제할까요?'))return;
+      S.todos=S.todos.filter(x=>x.id!==t.id);
+    }else if(action==='task-today'||action==='task-move'){
+      const day=action==='task-today'?today():document.getElementById('haru-task-date').value;
+      if(!day)return showErr('옮길 날짜를 선택해 주세요.');
+      t.date=day;t.wk='';t.held=false;
+    }else return;
+    save();render();haruOrganize(action==='task-move'?haruPastScroll:scroll);
+    toast(action==='task-delete'?'삭제했어요':'할 일을 옮겼어요');
+    return;
   }
   if(action==='csv-summary'||action==='csv-records'){
     const a=haruData();let rows;

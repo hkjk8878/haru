@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v134';
+const APP_VER='v135';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -867,7 +867,7 @@ const PALETTE=['#FF6B8A','#FF9CB0','#FF8A5C','#FFB347','#FFD166','#E9E36B',
 const OFFS=[['','알림 없음'],['0','정시에'],['5','5분 전'],['10','10분 전'],['30','30분 전'],['60','1시간 전'],['1440','하루 전']];
 const offLabel=v=>(OFFS.find(o=>o[0]===String(v))||['',''])[1];
 
-let installEvt=null, homeTab='todo', alarmOpen=false, pastOpen=false;
+let installEvt=null, homeTab='todo', alarmOpen=false;
 let mOpen={fix:true,inst:true,inc:false,sav:false,out:true,plan:true,rec:true};
 let S=null, tab='today', view=null, calMonth=null, moneyMonth=null,
     calFilter='all', statMode='week', statYM=null, weekStart=null, statCat='all', routineMode='group', catFilter='all', focusTodo=false,
@@ -1584,9 +1584,6 @@ function eventsOn(d){
 const isWeekTodo=t=>!!t.wk&&!t.date;
 const weekTodos=d=>S.todos.filter(t=>isWeekTodo(t)&&t.wk===monStart(d))
   .sort((a,b)=>((a.ord||0)-(b.ord||0)));
-/* 지난 주에 안 끝낸 것 */
-const weekTodosOld=d=>S.todos.filter(t=>isWeekTodo(t)&&!t.done&&t.wk<monStart(d))
-  .sort((a,b)=>(a.wk<b.wk?-1:1));
 const todosOn=d=>S.todos.filter(t=>!isWeekTodo(t)&&t.date===d)
   .sort((a,b)=>((a.ord||0)-(b.ord||0)));
 /* 할부는 전액이 아니라 그 달 회차 금액으로 센다 */
@@ -2536,13 +2533,13 @@ function tabRoutine(){
 /* ── 할 일 탭 ── */
 function tabTodo(){
   const list=todosOn(view);
-  const over=view===today()?S.todos.filter(t=>!t.done&&t.date&&t.date<today()):[];
+  const pastCount=view===today()?haruPastTodos().length:0;
   const steps=[];
   S.goals.forEach(g=>(g.steps||[]).forEach(x=>{if(x.due&&x.due<=view&&!x.done) steps.push({g,s:x})}));
   return `<div class="card"><header><h2>${md(view)}의 할 일</h2>
       <span class="count">${list.filter(t=>t.done).length}/${list.length}</span></header>
-      ${over.length?`<div class="overdue"><p>지난 할 일 ${over.length}개
-        <button data-haru="organize">골라서 정리하기</button></p></div>`:''}
+      ${pastCount?`<div class="overdue"><p>지난 할 일 ${pastCount}개
+        <button data-haru="organize">정리하기</button></p></div>`:''}
       <div style="margin-top:12px">
       ${steps.map(({g,s})=>`<button class="todo gl" data-step="${g.id}:${s.id}">
         <span class="box">✓</span><span>${esc(s.title)}</span><span class="tag">${esc(g.title)}</span></button>`).join('')}
@@ -2560,12 +2557,9 @@ function tabTodo(){
       /* ── 이번 주에 끝낼 일 ── */
       const wk=monStart(view), wkEnd=addDays(wk,6);
       const wl=weekTodos(view), wdn=wl.filter(t=>t.done).length;
-      const old2=view===today()?weekTodosOld(view):[];
       return `<div class="card wkcard"><header><h2>이번 주에 끝낼 일</h2>
         <span class="count">${wl.length?`${wdn}/${wl.length}`:''}</span></header>
         <div class="empty" style="padding:6px 16px 0">${md(wk)} ~ ${md(wkEnd)} · 날짜를 안 정해도 돼요</div>
-        ${old2.length?`<div class="overdue"><p>지난주에 안 끝낸 것 ${old2.length}개
-          <button data-wkmove="1">이번 주로</button></p></div>`:''}
         <div style="margin-top:10px">
         ${wl.map((t,i)=>`<div class="todo ${t.done?'done':''}">
           <button class="box" data-todo="${t.id}" aria-label="완료">✓</button>
@@ -2578,25 +2572,6 @@ function tabTodo(){
         ${!wl.length?'<div class="empty" style="padding-top:4px">이번 주 안에만 끝내면 되는 일을 적어 두세요.</div>':''}</div>
         <div class="addtodo"><input id="wkInput" type="text" placeholder="이번 주에 끝낼 일" maxlength="80">
           <button data-addwtodo="1">추가</button></div></div>`;
-    })()}
-    ${(()=>{
-      const days=[];
-      for(let i=1;i<=21;i++){ const d=addDays(view,-i); if(todosOn(d).length) days.push(d); }
-      if(!days.length) return '';
-      const left=days.reduce((a,d)=>a+todosOn(d).filter(t=>!t.done).length,0);
-      return `<details class="sec" id="pastTodos" style="margin-top:14px" ${pastOpen?'open':''}><summary>지난 할 일 ${left?`· 안 끝낸 것 ${left}개`:''}</summary>
-        <div class="secin">
-          ${days.map(d=>{
-            const ts=todosOn(d), dn=ts.filter(t=>t.done).length;
-            return `<div class="pastday">
-              <button class="pd" data-goday="${d}"><b>${md(d)} ${DAYS[dow(d)]}</b><span>${dn}/${ts.length} ›</span></button>
-              ${ts.map(t=>`<div class="todo ${t.done?'done':''}" style="padding:7px 2px;border:none">
-                <button class="box" data-todo="${t.id}" aria-label="완료">✓</button>
-                <span data-todo="${t.id}">${esc(t.title)}</span></div>`).join('')}
-            </div>`;
-          }).join('')}
-          <p class="tip">최근 3주치만 보여줍니다. 여기서도 바로 체크할 수 있어요.</p>
-        </div></details>`;
     })()}`;
 }
 
@@ -4294,7 +4269,7 @@ function gshiftSheet(gid){
 
 /* ══════════ 이벤트 ══════════ */
 document.addEventListener('click',ev=>{
-  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-addwtodo],[data-wktoday],[data-wkmove],[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-evfrom],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
+  const el=ev.target.closest('[data-tab],[data-nav],[data-stat],[data-cal],[data-mmonth],[data-rmode],[data-cfilter],[data-selday],[data-goday],[data-gotocal],[data-hab],[data-time],[data-settime],[data-cleartime],[data-savetime],[data-allgrp],[data-todo],[data-deltodo],[data-addtodo],[data-move],[data-step],[data-stepedit],[data-newstep],[data-savestep],[data-delstep],[data-newgrp],[data-editgrp],[data-savegrp],[data-delgrp],[data-newhab],[data-edithab],[data-savehab],[data-delhab],[data-newcat],[data-editcat],[data-savehabcat],[data-delhabcat],[data-newecat],[data-editecat],[data-saveevcat],[data-delevcat],[data-newmcat],[data-editmcat],[data-savemcat],[data-delmcat],[data-pickcat],[data-pickecat],[data-picktype],[data-color],[data-newev],[data-ev],[data-saveev],[data-delev],[data-newgoal],[data-editgoal],[data-savegoal],[data-delgoal],[data-newtx],[data-tx],[data-savetx],[data-deltx],[data-mtype],[data-pickm],[data-budget],[data-savebudget],[data-togglenotify],[data-export],[data-closebanner],[data-mvtoday],[data-unmv],[data-gshift],[data-gssave],[data-gsreset],[data-theme],[data-cvmove],[data-copywidget],[data-pushsum],[data-fixback],[data-fixgo],[data-dayoff],[data-newplan],[data-planok],[data-fswap],[data-fixall],[data-fixskip],[data-fixend],[data-cvsheet],[data-cvcat],[data-cvopt],[data-savecv],[data-delcv],[data-calfilter],[data-newfix],[data-editfix],[data-savefix],[data-delfix],[data-addfix],[data-addallfix],[data-edittodo],[data-savetodo],[data-addwtodo],[data-wktoday],,[data-tswap],[data-svtoggle],[data-evskip],[data-evsplit],[data-evfrom],[data-rd],[data-swap],[data-rx],[data-alarmlist],[data-statcat],[data-gonote],[data-hardrefresh],[data-copyhab],[data-skip],[data-mvgrp],[data-usemode],[data-toggcatedit],[data-editcatinline],[data-catcancel],[data-delcatinline],[data-newmode],[data-editmode],[data-savemode],[data-delmode],[data-showcatnew],[data-newcolor],[data-addcat],[data-mvhab],[data-addgrp],[data-movehab],[data-htab],[data-fold],[data-homeview],[data-addsheet],[data-newsolo],[data-addtogrp],[data-pickhab],[data-allsolo],[data-lvpick],[data-checklv],[data-week],[data-smonth],[data-nextline],[data-newline],[data-saveline],[data-delline],[data-linemode],[data-syncsheet],[data-syncup],[data-syncdown],[data-syncfirst],[data-syncjoin],[data-syncoff],[data-genroom],[data-pushsheet],[data-pushconnect],[data-pushtest],[data-pushcheck],[data-pushoff],[data-backupout],[data-backupin],[data-install],[data-day],[data-quick],[data-close],[data-reset]');
   if(!el) return;
   const d=el.dataset;
 
@@ -4378,14 +4353,6 @@ document.addEventListener('click',ev=>{
   if(d.wktoday){
     const t=S.todos.find(x=>x.id===d.wktoday);
     if(t){ t.date=today(); t.wk=''; t.core=false;t.held=false;save();render();toast('오늘 할 일로 옮겼어요'); }
-    return;
-  }
-  /* 지난주에 안 끝낸 것을 이번 주로 */
-  if(d.wkmove){
-    const w=monStart(today());
-    let n=0;
-    S.todos.forEach(t=>{ if(isWeekTodo(t)&&!t.done&&t.wk<w){ t.wk=w; n++; } });
-    save();render();toast(n?`${n}개를 이번 주로 옮겼어요`:'옮길 게 없어요');
     return;
   }
   if(d.step){const[gi,si]=d.step.split(':');
@@ -5191,7 +5158,6 @@ if(!matchMedia('(hover:none)').matches){
 }
 document.addEventListener('toggle',e=>{
   if(!e.target?.isConnected)return;
-  if(e.target&&e.target.id==='pastTodos') pastOpen=e.target.open;
   if(e.target&&(e.target.id||'').slice(0,3)==='mc-') mOpen[e.target.id.slice(3)]=e.target.open;
 },true);
 document.addEventListener('change',e=>{
