@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v140';
+const APP_VER='v141';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2749,8 +2749,8 @@ function calendarFixedRecord(f,date){
 function fixedBudgetItem(f,ym){
   if(f.type==='in'||!S.allocation)return null;
   const category=mcatOf(f.catId);
-  const name=f.name.replace(/\s*[（(][^()（）]*[)）]\s*$/,'').trim();
-  const id=HaruAllocation.aliasItem(f.name)||HaruAllocation.aliasItem(name)||category.allocationItem||HaruAllocation.aliasItem(category.name);
+  const name=HaruAllocation.budgetName(f.name);
+  const id=HaruAllocation.aliasItem(name)||category.allocationItem||HaruAllocation.aliasItem(category.name);
   const plan=HaruAllocation.planFor(S.allocation,ym);
   if(plan.uninitialized)return null;
   if(!id&&name==='비정기지출'){

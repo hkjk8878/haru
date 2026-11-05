@@ -50,7 +50,11 @@
   for(let i=0;i<left;i++)out[shares[i].id]++;
   return out;
  }
- function aliasItem(name){return Object.keys(aliases).find(id=>aliases[id].includes(String(name||'').trim()))||null;}
+ function budgetName(name){return String(name||'').trim().replace(/\s*[（(][^()（）]*[)）]\s*$/,'').trim();}
+ function aliasItem(name){
+  const label=budgetName(name);
+  return Object.keys(aliases).find(id=>aliases[id].includes(label))||null;
+ }
  function classify(r,model,cats=[],fixed=[]){
   const cat=cats.find(c=>c.id===r.catId)||{},fx=r.fx?fixed.find(f=>f.id===String(r.fx).split(':')[0]):null;
   let item=model.items.find(i=>i.id===(r.allocationItem||cat.allocationItem));
@@ -133,6 +137,6 @@
    shared:{limit:sharedLimit,used:sharedUsed,remaining:sharedLimit-sharedUsed},buffer:{limit:items.buffer.planned,used:bufferUsed,remaining:items.buffer.planned-bufferUsed},
    review:[...new Set(review)],achievedMonth:achieved,cutoff};
  }
- const api={definitions,aliases,createModel,planFor,saveBudget,distributeBudget,aliasItem,classify,rowsForMonth,snapshot};
+ const api={definitions,aliases,createModel,planFor,saveBudget,distributeBudget,budgetName,aliasItem,classify,rowsForMonth,snapshot};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.HaruAllocation=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
