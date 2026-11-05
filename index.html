@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v142';
+const APP_VER='v143';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2755,7 +2755,7 @@ function fixedBudgetItem(f,ym){
   if(plan.uninitialized)return null;
   if(!id&&name==='비정기지출'){
     const amount=S.allocation.items.filter(item=>item.group==='reserve').reduce((total,item)=>total+(plan.amounts[item.id]||0),0);
-    return {amount};
+    return {id:'reserve-total',amount};
   }
   const item=S.allocation.items.find(item=>item.id===id);
   if(!item)return null;
@@ -2844,12 +2844,12 @@ function vCal(){
         const c=mcatOf(f.catId);
         const record=calendarFixedRecord(f,view);
         const goal=fixedBudgetItem(f,monthOf(view));
-        const amount=record?.amount??goal?.amount??fixAmt(f,monthOf(view));
+        const amount=goal?.id==='reserve-total'?goal.amount:record?.amount??goal?.amount??fixAmt(f,monthOf(view));
         const fcl=MC.fix;
         return `<div class="ev" style="border-left-color:${fcl}">
           <span class="tm" style="color:${fcl}">고정 ${f.type==='in'?'수입':'지출'}</span>
           <span class="bd"><b style="font-weight:600">${esc(f.name)}</b>
-            <small>${esc(c.name)} · ${f.type==='in'?'수입':'지출'} ${won(amount)}${record?' · 기록됨':''}</small></span>
+            <small>${goal?.id==='reserve-total'?'월 예산':esc(c.name)+' · '+(f.type==='in'?'수입':'지출')} ${won(amount)}${record?(goal?.id==='reserve-total'?' · 이체 기록 '+won(record.amount):' · 기록됨'):''}</small></span>
           ${record?`<button class="fadd" data-tx="${esc(record.id)}">수정</button>`:`<button class="fadd" data-editfix="${esc(f.id)}" data-fix-month="${monthOf(view)}">${goal?'목표 수정':'수정'}</button>${amount>0?`<button class="fadd" data-addfix="${esc(f.id)}" data-fix-month="${monthOf(view)}">넣기</button>`:''}`}</div>`;
       }).join(''):''}
       ${cfMoney()?moneyOn(view).filter(x=>x.type==='transfer'&&!x.plan).map(txRow).join(''):''}
@@ -4923,9 +4923,10 @@ document.addEventListener('click',ev=>{
       if(S.money.some(m=>m.fx===key)) return;
       if(!fixActive(f,ym)) return;
       const dd=Math.min(fixDayOf(f,ym),daysIn(ym));
-      const amount=fixedBudgetItem(f,ym)?.amount??fixAmt(f,ym);
+      const goal=fixedBudgetItem(f,ym);
+      const amount=goal?.amount??fixAmt(f,ym);
       if(!(amount>0))return;
-      S.money.push({id:uid(),date:`${ym}-${pad(dd)}`,type:f.type||'out',catId:f.catId,
+      S.money.push({id:uid(),date:`${ym}-${pad(dd)}`,type:goal?.id==='reserve-total'?'transfer':f.type||'out',catId:f.catId,
         amount,memo:f.name,fx:key});
       n++;
     });

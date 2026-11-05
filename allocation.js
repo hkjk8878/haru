@@ -60,6 +60,7 @@
   let item=model.items.find(i=>i.id===(r.allocationItem||cat.allocationItem));
   if(!item){let id=aliasItem(fx?.name)||aliasItem(cat.name);if(!id&&(cat.sv||r.fx))id=aliasItem(r.memo);item=model.items.find(i=>i.id===id);}
   if(r.type==='in')return {kind:'income',group:'income',item:null,review:false};
+  if(r.fx&&budgetName(fx?.name||r.memo)==='비정기지출')return {kind:'transfer',group:'transfer',item:null,review:false};
   if(r.type==='transfer')return {kind:'transfer',group:item?.group||'transfer',item:item?.id||null,review:false};
   const markedFixed=cat.id==='fix'||cat.spendKind==='fixed'||cat.name==='고정비'||(r.fx&&!cat.sv&&item?.group!=='saving');
   if(markedFixed&&item?.group!=='fixed')return {kind:'expense',group:'fixed',item:null,review:true};

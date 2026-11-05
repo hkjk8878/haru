@@ -57,8 +57,7 @@ vMoney=function(){
  <div class="alloc-groups">${Object.entries(p).map(([key,g])=>{
   const v=a.groups[key];
   return `<details class="haru-board alloc-group" id="alloc-group-${key}" style="--alloc-color:${g.color}"><summary><span class="alloc-group-title"><b>${g.name}</b><span>${key==='saving'?'월 목표':key==='reserve'?'남은 예산':'월 예산'}</span></span><strong class="alloc-group-budget">${allocationMoney(key==='reserve'?v.remaining:v.planned)}</strong><span class="alloc-group-progress">${key==='reserve'?`<span>매달 추가 <b>${allocationMoney(v.planned)}</b></span>`:''}<span>${g.verb} <b>${allocationMoney(key==='reserve'?v.spent:v.actual)}</b></span>${key!=='reserve'&&key!=='saving'?`<span class="${v.remaining<0?'haru-danger':''}">${v.remaining<0?'초과':'남음'} <b>${allocationMoney(Math.abs(v.remaining))}</b></span>`:''}</span></summary>
-  <div class="alloc-items">${S.allocation.items.filter(i=>i.group===key).map(i=>allocationItemRow(a.items[i.id],a)).join('')}</div>
-  ${key==='reserve'?`<div class="alloc-callout">매달 예산 자동 추가 · 남은 예산 이월<br>이번 달 실제 소비 <b>${allocationMoney(v.spent)}</b><br>남은 예산 <b>${allocationMoney(['gift','special','medical'].reduce((n,id)=>n+a.items[id].balance,0))}</b></div>`:''}
+  <div class="alloc-items">${key==='reserve'?'<div class="haru-actions"><button data-alloc="item-budget" data-item="reserve-total">월 예산 수정</button><button data-alloc="record-reserve">사용 기록</button></div>':S.allocation.items.filter(i=>i.group===key).map(i=>allocationItemRow(a.items[i.id],a)).join('')}</div>
   ${key==='saving'&&a.achievedMonth?`<p class="haru-muted">비상금 목표 달성 · 다음 달부터 결혼자금 목표에 합산</p>`:''}</details>`;
  }).join('')}</div>
  <details class="haru-board haru-fold" id="alloc-metrics"><summary>월 요약</summary><div class="alloc-income-pair"><span>실제 소비</span><b>${allocationMoney(a.spending)}</b></div><div class="alloc-income-pair"><span>저축·투자 / 실제 수입</span><b>${a.savingRate===null?'수입 기록 필요':(a.savingRate*100).toFixed(1)+'%'}</b></div><div class="haru-actions"><button data-alloc="csv">기록 CSV</button><button data-alloc="plan-csv">예산표 CSV</button><button data-alloc="openings">시작 잔액</button></div></details>
@@ -93,13 +92,16 @@ function allocationReadForm(){
 txSheet=function(id){
  allocationInit();const r=id?S.money.find(x=>x.id===txId(id)):null,c=r?allocationClass(r):null;
  const kind=r?(c.kind==='income'?'income':c.kind==='saving'?'saving':c.kind==='transfer'?'transfer':'expense'):allocationLastKind;
- const group=c&&['fixed','living','reserve'].includes(c.group)?c.group:'living';
+ const recordGroup=c?.group||(!r?S.allocation.items.find(i=>i.id===allocationLastItem)?.group:null);
+ const group=['fixed','living','reserve'].includes(recordGroup)?recordGroup:'living';
  const item=r?(kind==='income'?(ALLOC_INCOMES.find(([,n])=>n===mcatOf(r.catId).name)?.[0]||'other'):c.item||''):allocationLastItem;
  allocationForm={id:r?.id||'',kind,group,item,from:r?.allocationFrom||'',amount:r?.amount||'',memo:r?.memo||'',date:r?.date||(tab==='money'&&moneyMonth!==monthOf(today())?moneyMonth+'-'+pad(Math.min(+today().slice(8),daysIn(moneyMonth))):today()),plan:r?.plan||false,inst:r?.inst||0,original:r?{...r}:null};
  if(!r&&!allocationOptions(kind,group).some(i=>i.id===item))allocationForm.item=allocationOptions(kind,group)[0]?.id||'';
  allocationRenderForm();
 };
 function allocationScopeField(){return '<div class="field"><label for="alloc-budget-scope">적용 기간</label><select id="alloc-budget-scope"><option value="month">이번 달만</option><option value="ongoing">앞으로 계속</option></select></div>';}
+const RESERVE_BUDGET='reserve-total';
+const reserveBudgetItems=()=>S.allocation.items.filter(i=>i.group==='reserve');
 let allocationBudgetWeights=null;
 function allocationBudgetDraft(){
  const a=allocationSnapshot(),plan=HaruAllocation.planFor(S.allocation,moneyMonth);
@@ -108,7 +110,12 @@ function allocationBudgetDraft(){
   if(r.plan||r.date>a.cutoff||!(r.amount>0))continue;
   const c=allocationClass(r);if(c.item)required.add(c.item);if(r.allocationFrom)required.add(r.allocationFrom);
  }
- return {amounts:{...plan.amounts},required:[...required],retained:S.allocation.monthRetained?.[moneyMonth]||plan.retained||[]};
+ const amounts={...plan.amounts};
+ const reserveIds=reserveBudgetItems().map(i=>i.id);
+ amounts[RESERVE_BUDGET]=reserveIds.reduce((sum,id)=>sum+(amounts[id]||0),0);
+ reserveIds.forEach(id=>delete amounts[id]);
+ const retained=(S.allocation.monthRetained?.[moneyMonth]||plan.retained||[]).map(id=>reserveIds.includes(id)?RESERVE_BUDGET:id);
+ return {amounts,required:[...required].filter(id=>!reserveIds.includes(id)),retained};
 }
 function allocationBudgetInputs(){return [...document.querySelectorAll('[data-plan-item]')];}
 function allocationBudgetSum(){
@@ -131,8 +138,8 @@ function allocationDistribute(){
 function allocationPlanSheet(itemId){
  const draft=allocationBudgetDraft();allocationBudgetWeights={...draft.amounts};
  const total=Object.values(draft.amounts).reduce((a,b)=>a+b,0);
- openSheet(`<h2>예산 설정</h2><p class="hint">${moneyMonth} · 유지할 금액을 빼고 나머지를 자동으로 나눠요.</p><p class="err" id="err"></p><div class="field"><label for="alloc-budget-total">전체 예산</label><input id="alloc-budget-total" type="number" inputmode="numeric" min="0" step="1" value="${total}"></div>${Object.entries(ALLOC_GROUPS).map(([g,v])=>`<h3 class="alloc-plan-heading">${v.name}</h3>${S.allocation.items.filter(i=>i.group===g).map(i=>{const required=draft.required.includes(i.id),checked=required||draft.retained.includes(i.id);return `<div class="alloc-plan-row alloc-distribute-row"><label for="plan-${i.id}">${esc(i.name)}</label><input id="plan-${i.id}" data-plan-item="${i.id}" type="number" inputmode="numeric" min="0" step="1" value="${draft.amounts[i.id]||0}"><label class="alloc-retain"><input type="checkbox" aria-label="${esc(i.name)} 금액 유지" data-plan-retain="${i.id}" ${checked?'checked':''} ${required?'disabled':''}><span>금액 유지${required?(g==='fixed'?' · 고정비':' · 기록 있음'):''}</span></label></div>`;}).join('')}`).join('')}<p class="alloc-plan-total" id="alloc-plan-total">분배 합계 ${allocationMoney(total)}</p>${allocationScopeField()}<div class="actions"><button class="cancel" data-close="1">취소</button><button class="save" data-alloc="save-plan">저장</button></div>`);
- if(itemId)document.getElementById('plan-'+itemId)?.focus();
+ openSheet(`<h2>예산 설정</h2><p class="hint">${moneyMonth} · 유지할 금액을 빼고 나머지를 자동으로 나눠요.</p><p class="err" id="err"></p><div class="field"><label for="alloc-budget-total">전체 예산</label><input id="alloc-budget-total" type="number" inputmode="numeric" min="0" step="1" value="${total}"></div>${Object.entries(ALLOC_GROUPS).map(([g,v])=>`<h3 class="alloc-plan-heading">${v.name}</h3>${(g==='reserve'?[{id:RESERVE_BUDGET,name:'월 예산'}]:S.allocation.items.filter(i=>i.group===g)).map(i=>{const required=draft.required.includes(i.id),checked=required||draft.retained.includes(i.id);return `<div class="alloc-plan-row alloc-distribute-row"><label for="plan-${i.id}">${esc(i.name)}</label><input id="plan-${i.id}" data-plan-item="${i.id}" type="number" inputmode="numeric" min="0" step="1" value="${draft.amounts[i.id]||0}"><label class="alloc-retain"><input type="checkbox" aria-label="${esc(i.name)} 금액 유지" data-plan-retain="${i.id}" ${checked?'checked':''} ${required?'disabled':''}><span>금액 유지${required?(g==='fixed'?' · 고정비':' · 기록 있음'):''}</span></label></div>`;}).join('')}`).join('')}<p class="alloc-plan-total" id="alloc-plan-total">분배 합계 ${allocationMoney(total)}</p>${allocationScopeField()}<div class="actions"><button class="cancel" data-close="1">취소</button><button class="save" data-alloc="save-plan">저장</button></div>`);
+ if(itemId)document.getElementById('plan-'+(reserveBudgetItems().some(i=>i.id===itemId)?RESERVE_BUDGET:itemId))?.focus();
 }
 function allocationOpeningSheet(){
  const m=S.allocation;
@@ -158,6 +165,7 @@ document.addEventListener('click',async e=>{
  if(action==='item-budget')allocationPlanSheet(d.item);
  if(action==='openings')allocationOpeningSheet();
  if(action==='review'||action==='all-records'){allocationRecordScope=action==='review'?'review':'all';render();}
+ if(action==='record-reserve'){allocationLastKind='expense';allocationLastItem='gift';txSheet();}
  if(action==='record-item'){
   const item=S.allocation.items.find(i=>i.id===d.item);allocationLastKind=item.group==='saving'?(['marriage','emergency'].includes(item.id)?'transfer':'saving'):'expense';allocationLastItem=item.id;txSheet();allocationForm.group=item.group;allocationForm.item=item.id;allocationRenderForm();
  }
@@ -179,14 +187,22 @@ document.addEventListener('click',async e=>{
   allocationLastKind=f.kind;allocationLastItem=f.item;save();closeSheet();render();toast('저장했어요');
  }
  if(action==='save-plan'){
-  const plan=HaruAllocation.planFor(S.allocation,moneyMonth);
+  const draft=allocationBudgetDraft();
   const inputs=[...document.querySelectorAll('[data-plan-item]')];
   if(inputs.some(i=>!allocationValidNumber(i.value)))return showErr('0 이상의 금액을 입력해 주세요.');
   if(!allocationDistribute())return;
   const scope=document.getElementById('alloc-budget-scope').value;
-  const previous=allocationBudgetDraft().retained;
+  const previous=draft.retained;
   const retained=[...document.querySelectorAll('[data-plan-retain]')].filter(i=>i.checked&&(!i.disabled||previous.includes(i.dataset.planRetain))).map(i=>i.dataset.planRetain);
-  const amounts=Object.fromEntries(inputs.filter(i=>Math.round(+i.value)!==(plan.amounts[i.dataset.planItem]||0)||(scope==='ongoing'&&Object.hasOwn(S.allocation.monthOverrides?.[moneyMonth]||{},i.dataset.planItem))).map(i=>[i.dataset.planItem,Math.round(+i.value)]));
+  const overrides=S.allocation.monthOverrides?.[moneyMonth]||{};
+  const reserveIds=reserveBudgetItems().map(i=>i.id);
+  const amounts={};
+  for(const input of inputs){
+   const id=input.dataset.planItem,value=+input.value;
+   const ids=id===RESERVE_BUDGET?reserveIds:[id];
+   if(value===draft.amounts[id]&&!(scope==='ongoing'&&ids.some(key=>Object.hasOwn(overrides,key))))continue;
+   ids.forEach((key,index)=>amounts[key]=index===0?value:0);
+  }
   HaruAllocation.saveBudget(S.allocation,moneyMonth,amounts,scope);
   if(scope==='month'){S.allocation.monthRetained=S.allocation.monthRetained||{};S.allocation.monthRetained[moneyMonth]=retained;}
   else{S.allocation.plans[moneyMonth].retained=retained;if(S.allocation.monthRetained)delete S.allocation.monthRetained[moneyMonth];}
