@@ -117,6 +117,9 @@
   let income=0,spending=0;const review=[];
   current.forEach(r=>{
    const c=classify(r,model,cats,fixed),v=cash(r.amount),i=items[c.item],g=groups[c.group];
+   if(c.kind==='transfer'&&(c.group==='reserve'||(r.fx&&c.group==='transfer'&&budgetName(fixed.find(f=>f.id===String(r.fx).split(':')[0])?.name||r.memo)==='비정기지출'))){
+    groups.reserve.deposited=(groups.reserve.deposited||0)+v;
+   }
    if(c.kind==='income'){income+=v;return;}
    if(c.review)review.push(r.instOf||r.id);
    if(c.kind==='expense'){
