@@ -857,7 +857,7 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v144';
+const APP_VER='v145';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1499,17 +1499,26 @@ const soloOn=d=>{
   return occSolo(d).filter(o=>seen[o.h.id]?false:(seen[o.h.id]=true)).map(o=>o.h);
 };
 const byOrd=(a,b)=>(a.ord||0)-(b.ord||0);
+function modeMatchesDay(mode,d){
+  const day=dow(d),weekend=day===0||day===6;
+  return mode.weekly==='weekend'?weekend:mode.weekly==='weekday'?!weekend:true;
+}
 function activeMode(d){
   const ov=S.modeOverride;
-  if(ov&&ov.date===d)
-    return ov.id?((S.modes||[]).find(m=>m.id===ov.id)||null):null;
-  const ms=(S.modes||[]).filter(m=>m.from&&m.to&&d>=m.from&&d<=m.to)
+  const modes=S.modes||[];
+  if(ov&&ov.date===d){
+    if(!ov.id)return null;
+    const chosen=modes.find(m=>m.id===ov.id);
+    if(chosen&&modeMatchesDay(chosen,d))return chosen;
+  }
+  const ms=modes.filter(m=>m.from&&m.to&&d>=m.from&&d<=m.to&&modeMatchesDay(m,d))
     .sort((a,b)=>a.from<b.from?-1:1);
   if(ms.length) return ms[ms.length-1];
-  const id=S.activeModeId||'';
-  return id?((S.modes||[]).find(m=>m.id===id)||null):null;
+  const weekly=modes.filter(m=>m.weekly&&!m.from&&modeMatchesDay(m,d));
+  if(weekly.length)return weekly[weekly.length-1];
+  return modes.find(m=>m.id===S.activeModeId&&!m.weekly)||null;
 }
-const modeReserved=d=>(S.modes||[]).some(m=>m.from&&m.to&&d>=m.from&&d<=m.to);
+const modeReserved=d=>(S.modes||[]).some(m=>m.from&&m.to&&d>=m.from&&d<=m.to&&modeMatchesDay(m,d));
 function inMode(mv,d){
   const am=activeMode(d);
   mv=mv||'';
@@ -2673,7 +2682,7 @@ function vRoutine(){
     <div class="card"><header><h2>루틴 모드</h2>
       <span class="count">${1+(S.modes||[]).length}개</span></header>
       <div class="empty" style="padding-bottom:8px">상황별로 루틴 묶음을 저장해 두고 전환해서 씁니다.
-        날짜를 예약해 두면 그 기간에 저절로 바뀌어요.</div>
+        평일·주말에 자동 전환하거나 특정 기간을 예약할 수 있어요.</div>
       ${(()=>{
         const cur=activeMode(today());
         const rows=[{id:'',name:'데일리 모드',base:true,def:true,from:'',to:''}].concat((S.modes||[]).slice());
@@ -2685,8 +2694,8 @@ function vRoutine(){
           return `<div class="moderow ${on?'on':''}">
             <span class="mi">
               <b>${esc(m.name)}${m.def?' <u>기본</u>':''}${on?' <s>적용중</s>':''}</b>
-              <small>루틴 ${cnt}개${m.from?` · 예약 ${md(m.from)}–${md(m.to)}`:''}${(!m.def&&!m.base)?' · 이 모드만':''}</small></span>
-            ${on?'':`<button class="mact" data-usemode="${m.id}">적용</button>`}
+              <small>루틴 ${cnt}개${m.weekly==='weekend'?' · 주말 자동':m.weekly==='weekday'?' · 평일 자동':''}${m.from?` · 예약 ${md(m.from)}–${md(m.to)}`:''}${(!m.def&&!m.base)?' · 이 모드만':''}</small></span>
+            ${on||!modeMatchesDay(m,today())?'':`<button class="mact" data-usemode="${m.id}">적용</button>`}
             ${m.def?'':`<button class="medit" data-editmode="${m.id}">설정</button>`}
           </div>`;
         }).join('');
@@ -3610,13 +3619,20 @@ function addSheet(){
 function modeSheet(id){
   const m=id?(S.modes||[]).find(x=>x.id===id):null;
   openSheet(`<h2>${m?'모드 수정':'루틴 모드 만들기'}</h2>
-    <p class="hint">여행·시험기간처럼 평소와 다른 기간을 정해 두는 기능이에요.</p>
+    <p class="hint">모드를 쓸 요일을 정하면 그날 자동으로 적용돼요.</p>
     <p class="err" id="err"></p>
     <div class="field"><label for="f-name">모드 이름</label>
       <input id="f-name" type="text" value="${m?esc(m.name):''}" placeholder="여행 모드" maxlength="14"></div>
-    <div class="field"><label>날짜 예약 (비워두면 직접 전환해서 씁니다)</label>
-      <div class="row2"><div class="field" style="margin:0"><input id="f-from" type="date" value="${m?m.from||'':''}"></div>
-        <div class="field" style="margin:0"><input id="f-to" type="date" value="${m?m.to||'':''}"></div></div></div>
+    <div class="field"><label for="f-weekly">자동 적용 요일</label>
+      <select id="f-weekly">
+        <option value="">요일 자동 적용 안 함</option>
+        <option value="weekday" ${m?.weekly==='weekday'?'selected':''}>평일 (월~금)</option>
+        <option value="weekend" ${m?.weekly==='weekend'?'selected':''}>주말 (토·일)</option>
+      </select></div>
+    <details ${m?.from?'open':''}><summary>특정 기간 예약 (선택)</summary>
+    <div class="field"><label>시작일과 종료일</label>
+      <div class="row2"><div class="field" style="margin:0"><input id="f-from" aria-label="시작일" type="date" value="${m?m.from||'':''}"></div>
+        <div class="field" style="margin:0"><input id="f-to" aria-label="종료일" type="date" value="${m?m.to||'':''}"></div></div></div></details>
     <div class="field"><label for="f-base">기존 루틴</label>
       <select id="f-base">
         <option value="0" ${m&&m.base?'':'selected'}>이 기간엔 이 모드 루틴만 보기</option>
@@ -4656,8 +4672,10 @@ document.addEventListener('click',ev=>{
     if(!name) return showErr('모드 이름을 적어 주세요.');
     if((from&&!to)||(!from&&to)) return showErr('예약은 시작과 끝을 함께 정해 주세요.');
     if(from&&to&&to<from) return showErr('끝 날짜가 시작보다 빠를 수 없어요.');
-    const o={name,from,to,base:$('#f-base').value==='1'};
     S.modes||=[];
+    const weekly=$('#f-weekly').value;
+    if(weekly&&!from&&S.modes.some(m=>m.id!==d.savemode&&m.weekly===weekly&&!m.from))return showErr('같은 요일에 자동 적용되는 모드가 있어요. 기존 모드 설정을 수정해 주세요.');
+    const o={name,from,to,weekly,base:$('#f-base').value==='1'};
     if(d.savemode) Object.assign(S.modes.find(x=>x.id===d.savemode),o);
     else S.modes.push({id:uid(),...o});
     save();closeSheet();render();toast('모드를 저장했어요');
@@ -4682,10 +4700,12 @@ document.addEventListener('click',ev=>{
     return;
   }
   if(d.usemode!==undefined){
-    S.activeModeId=d.usemode||'';
-    S.modeOverride={date:today(),id:S.activeModeId};
+    const chosen=(S.modes||[]).find(m=>m.id===d.usemode);
+    if(chosen&&!modeMatchesDay(chosen,today()))return;
+    if(!chosen?.weekly)S.activeModeId=d.usemode||'';
+    S.modeOverride={date:today(),id:d.usemode||''};
     save();render();
-    toast(S.activeModeId?'모드를 바꿨어요':'데일리 모드로 돌아왔어요');
+    toast(d.usemode?'모드를 바꿨어요':'데일리 모드로 돌아왔어요');
     return;
   }
   if(d.delmode){
