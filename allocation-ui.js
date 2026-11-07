@@ -48,11 +48,22 @@ vMoney=function(){
  allocationInit();const a=allocationSnapshot(),p=ALLOC_GROUPS;
  const allRows=HaruAllocation.rowsForMonth(S.money,moneyMonth).sort((x,y)=>y.date.localeCompare(x.date)||String(y.id).localeCompare(String(x.id)));
  const rows=allocationRecordScope==='review'?allRows.filter(r=>a.review.includes(txId(r.id))):allRows;
+ const living=a.groups.living;
+ const remaining=living.planned-living.spent;
+ const over=remaining<0;
+ const usage=living.planned>0?Math.max(0,Math.min(100,living.spent/living.planned*100)):0;
 
  return `<div class="top"><div class="datenav"><h1>가계부</h1><button class="pill g" data-newtx="1">＋ 기록</button></div></div>
  <section class="haru-board alloc-income"><div class="calnav"><button data-mmonth="${prevYM(moneyMonth)}" aria-label="지난달">‹</button><b>${moneyMonth.slice(0,4)}년 ${Number(moneyMonth.slice(5))}월</b><button data-mmonth="${addYM(moneyMonth,1)}" aria-label="다음달">›</button></div>
- <div class="alloc-income-main"><span>이번 달 생활비 ${a.groups.living.remaining<0?'초과':'남음'}</span><strong class="${a.groups.living.remaining<0?'haru-danger':''}">${allocationMoney(Math.abs(a.groups.living.remaining))}</strong></div>
- <div class="alloc-income-pair"><span>생활비 사용</span><b>${allocationMoney(a.groups.living.actual)}</b></div><div class="alloc-income-pair"><span>생활비 예산</span><b>${allocationMoney(a.groups.living.planned)}</b></div><div class="alloc-income-pair"><span>이번 달 총수입</span><b>${allocationMoney(a.income)}</b></div>
+ <h2 class="alloc-living-title">이번 달 생활비</h2>
+ <div class="alloc-living-summary">
+  <div><span>쓴 금액</span><strong>${allocationMoney(living.spent)}</strong></div>
+  <div><span>${over?'예산 초과':'남은 금액'}</span><strong class="${over?'haru-danger':''}">${allocationMoney(Math.abs(remaining))}</strong></div>
+ </div>
+ <div class="alloc-living-meter ${over?'is-over':''}" aria-hidden="true"><i style="width:${usage}%"></i></div>
+ <div class="alloc-income-pair"><span>생활비 예산</span><b>${allocationMoney(living.planned)}</b></div>
+ <div class="alloc-income-pair"><span>이번 달 전체 소비</span><b>${allocationMoney(a.spending)}</b></div>
+ <div class="alloc-income-pair"><span>이번 달 총수입</span><b>${allocationMoney(a.income)}</b></div>
  <div class="haru-actions"><button data-alloc="plan">예산·목표 수정</button></div></section>
  <div class="alloc-groups">${Object.entries(p).map(([key,g])=>{
   const v=a.groups[key];
