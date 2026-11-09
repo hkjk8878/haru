@@ -269,12 +269,11 @@ body.pixel .seg4 button u{font-size:9px}
 .todo .mvs button{width:26px;height:26px;border-radius:8px;font-size:8.5px}
 .todo span{line-height:1.45;white-space:normal;word-break:break-word}
 .todo .ttl .tm2{font-style:normal;font-size:11.5px;font-weight:700;color:var(--muted);margin-right:6px}
-.todo.done .ttl{color:var(--muted);text-decoration:line-through}
+.todo.done .todo-title,.step.done .step-title{color:var(--muted);text-decoration:line-through}
 .todo .tag{font-size:11px;font-weight:650;color:var(--goal);background:var(--goal-soft);
   padding:3px 7px;border-radius:99px;flex:none}
 .todo .x{color:var(--muted);font-size:16px;opacity:.55;flex:none;padding:0 2px}
 .todo.done .box{background:var(--task);border-color:var(--task);color:var(--onAccent)}
-.todo.done span{color:var(--muted);text-decoration:line-through}
 .todo.gl .box{border-color:#574828}
 .todo.gl.done .box{background:var(--goal);border-color:var(--goal)}
 .addtodo{display:flex;gap:8px;padding:11px 14px 13px;border-top:1px solid var(--line);
@@ -313,7 +312,6 @@ body.pixel .addtodo button{font-size:12px;padding:10px 12px}
 .step span{flex:1;font-size:14px}
 .step small{font-size:11.5px;color:var(--muted);flex:none}
 .step.done .box{background:var(--goal);border-color:var(--goal);color:var(--onAccent)}
-.step.done span{color:var(--muted);text-decoration:line-through}
 .step.late small{color:var(--task);font-weight:650}
 
 .mrow{display:flex;align-items:center;gap:11px;width:100%;padding:12px 16px;
@@ -846,16 +844,20 @@ body.pixel .sec>summary,body.pixel .sec2>summary{background:var(--card2)}
 :is(body,body.pixel) :is(.hb.done .tick,.todo.done .box,.step.done .box,.lrow.done .lc,.calendar-check[aria-pressed="true"]){
   background:var(--check-fill);border-color:var(--check-border);color:var(--check-ink);
   box-shadow:inset 0 2px 0 rgb(255 255 255 / 35%);
+  border-radius:0;font-family:system-ui,sans-serif;
 }
 .calendar-check{width:22px;height:22px;flex:none;border-radius:5px;border:2px solid var(--check-border);display:grid;place-items:center;font-size:12px;color:transparent}
 input[type="checkbox"]{accent-color:var(--check-fill)}
 .todo-list{display:grid;gap:9px;padding:0 12px}
 .todo-list .todo{background:var(--card2);border:0;border-radius:10px;padding:12px;gap:8px;min-height:68px}
 body.pixel .todo-list .todo{background:#F7EBD3}
-.todo-list .check-hit{width:44px;height:44px;flex:none;display:grid;justify-items:center;align-items:start;padding-top:3px}
+.todo-list .check-hit{width:44px;height:44px;flex:none;display:grid;justify-items:center;align-items:start;padding-top:2px}
 :is(body,body.pixel) .todo-list .check-hit .box{width:22px;height:22px;margin:0;border-radius:5px}
 :is(body,body.pixel) .todo-list .todo:not(.done) .check-hit .box{background:#D9D9D9;border-color:transparent;box-shadow:none}
-.todo-list .ttl{min-height:44px;font-size:16px;overflow-wrap:anywhere}
+.todo-list .ttl{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;min-height:44px;padding:0;font-size:16px;line-height:26px;overflow-wrap:anywhere}
+.todo-list .todo-title{flex:none;font:inherit;line-height:inherit;text-align:left}
+.todo-list .mvs{margin-top:0}
+.todo-list .todo.done .check-hit .box{border-radius:0}
 .todo-list .ttl .tm2{display:block;margin:2px 0 0;font-size:10px;letter-spacing:1px;font-weight:400}
 </style>
 <link rel="stylesheet" href="upgrade.css">
@@ -872,7 +874,7 @@ body.pixel .todo-list .todo{background:#F7EBD3}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v147';
+const APP_VER='v148';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2569,7 +2571,7 @@ function tabTodo(){
         <span class="box">✓</span><span>${esc(s.title)}</span><span class="tag">${esc(g.title)}</span></button>`).join('')}
       ${list.map((t,i)=>`<div class="todo ${t.done?'done':''}">
         <button class="check-hit" data-todo="${t.id}" aria-label="완료" aria-pressed="${!!t.done}"><span class="box" aria-hidden="true">✓</span></button>
-        <button class="ttl" data-edittodo="${t.id}">${esc(t.title)}${t.notify?' 🔔':''}${t.time?`<em class="tm2">${esc(t.date.slice(5).replace('-','/'))}·${esc(t.time)}</em>`:''}</button>
+        <button class="ttl" data-edittodo="${t.id}"><span class="todo-title">${esc(t.title)}</span>${t.time||t.notify?`<em class="tm2">${t.time?esc(t.date.slice(5).replace('-','/'))+'·'+esc(t.time):''}${t.notify?' 🔔':''}</em>`:''}</button>
         ${list.length>1?`<span class="mvs">
           <button ${i===0?'disabled':`data-tswap="${t.id}:${list[i-1].id}"`}>▲</button>
           <button ${i===list.length-1?'disabled':`data-tswap="${t.id}:${list[i+1].id}"`}>▼</button></span>`:''}
@@ -2587,7 +2589,7 @@ function tabTodo(){
         <div class="todo-list" style="margin-top:10px">
         ${wl.map((t,i)=>`<div class="todo ${t.done?'done':''}">
           <button class="check-hit" data-todo="${t.id}" aria-label="완료" aria-pressed="${!!t.done}"><span class="box" aria-hidden="true">✓</span></button>
-          <button class="ttl" data-edittodo="${t.id}">${esc(t.title)}</button>
+          <button class="ttl" data-edittodo="${t.id}"><span class="todo-title">${esc(t.title)}</span></button>
           ${t.done?'':`<button class="wkto" data-wktoday="${t.id}">오늘로</button>`}
           ${wl.length>1?`<span class="mvs">
             <button ${i===0?'disabled':`data-tswap="${t.id}:${wl[i-1].id}"`}>▲</button>
@@ -2957,7 +2959,7 @@ function vCal(){
         ${(g.steps||[]).map(s=>{
           const late=s.due&&!s.done&&s.due<today();
           return `<button class="step ${s.done?'done':''} ${late?'late':''}" data-stepedit="${g.id}:${s.id}">
-            <span class="box" data-step="${g.id}:${s.id}">✓</span><span>${esc(s.title)}</span>
+            <span class="box" data-step="${g.id}:${s.id}">✓</span><span class="step-title">${esc(s.title)}</span>
             <small>${s.due?(late?'지남 ':'')+md(s.due):''}</small></button>`;
         }).join('')}
         <button class="addbtn" style="color:var(--goal)" data-newstep="${g.id}">＋ 단계 추가</button></div>`;
