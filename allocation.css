@@ -22,6 +22,6 @@
 @media(min-width:850px){.alloc-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.alloc-income{max-width:100%}.alloc-groups .haru-board{margin-bottom:0}.alloc-groups{margin-bottom:18px}}
 @media(max-width:360px){.alloc-group-budget{font-size:22px}.alloc-plan-row{grid-template-columns:minmax(0,1fr) 110px}.alloc-item-head{gap:7px}}
 .alloc-distribute-row .alloc-retain{grid-column:1/-1;display:flex;align-items:center;gap:8px;min-height:32px;font-size:12px;color:var(--muted);white-space:nowrap}
-.alloc-distribute-row .alloc-retain input{width:18px;height:18px;margin:0;flex:0 0 18px;accent-color:var(--accent,#8AA9FF)}
+.alloc-distribute-row .alloc-retain input{width:18px;height:18px;margin:0;flex:0 0 18px}
 .alloc-distribute-row{row-gap:3px;padding-bottom:10px}
 .alloc-distribute-row>label:first-child{word-break:keep-all}
