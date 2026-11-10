@@ -874,7 +874,7 @@ body.pixel .todo-list .todo{background:#F7EBD3}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v148';
+const APP_VER='v149';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -1337,7 +1337,15 @@ function ocOf(d,id){
   const k=Math.max(0,Math.min(+r.n||1,habTimes(id)));
   return Array.from({length:k},(_,i)=>i);
 }
-const doneN=(d,id)=>ocOf(d,id).length;
+function plannedRounds(h,d){
+  if(!h||!onDay(h,d))return [];
+  return Array.from({length:habTimes(h.id)},(_,i)=>i).filter(i=>rOn(h,i,d));
+}
+const plannedCount=(d,id)=>plannedRounds(habById(id),d).length;
+const doneN=(d,id)=>{
+  const done=ocOf(d,id);
+  return plannedRounds(habById(id),d).filter(i=>done.includes(i)).length;
+};
 const occIs=(d,id,i)=>ocOf(d,id).indexOf(i)>=0;
 /* 회차를 통째로 정한다. 비면 기록을 지운다 */
 function setOc(d,id,arr){
@@ -1379,7 +1387,7 @@ function groupWeekDone(g,d){
 const dayOff=d=>!!log(d).off;
 const alwaysOn=id=>{const h=S.habits.find(x=>x.id===id);return !!(h&&h.always)};
 const isSkip=(d,id)=>(dayOff(d)&&!alwaysOn(id))||!!skipsOf(d)[id];
-const isDone=(d,id)=>doneN(d,id)>=habTimes(id);
+const isDone=(d,id)=>{const count=plannedCount(d,id);return count>0&&doneN(d,id)===count};
 const doneAt=(d,id)=>{const r=rec(d,id);return r&&r.at?r.at:''};
 const doneVal=(d,id)=>{const r=rec(d,id);return r&&r.v?r.v:''};
 const NOCAT={id:'',name:'분류 없음',color:'#8A87A0'};
@@ -1556,8 +1564,7 @@ function occOn(d){
   const out=[];
   S.habits.forEach(h=>{
     if(!alive(h)||!onDay(h,d)||!inMode(modeOf(h),d)) return;
-    const t=habTimes(h.id);
-    for(let i=0;i<t;i++) if(rOn(h,i,d)) out.push({h,i});
+    for(const i of plannedRounds(h,d))out.push({h,i});
   });
   return out;
 }
@@ -1624,16 +1631,16 @@ function rateList(d,hs){
   if(!hs.length) return null;
   let tot=0,dn=0;
   hs.filter(h=>!isSkip(d,h.id)).forEach(h=>{
-    const t=habTimes(h.id); tot+=t; dn+=Math.min(doneN(d,h.id),t);
+    tot+=plannedCount(d,h.id); dn+=doneN(d,h.id);
   });
   return tot?dn/tot:null;
 }
 const rate=d=>rateList(d,habitsOn(d));
 function streak(h){
-  let n=0,d=today(),days=habDays(h);
+  let n=0,d=today();
   for(let i=0;i<400;i++){
     if(h.from&&d<h.from) break;
-    if(days.includes(dow(d))&&inRange(h,d)&&!isSkip(d,h.id)){
+    if(plannedRounds(h,d).length&&!isSkip(d,h.id)){
       if(isDone(d,h.id)) n++;
       else if(d!==today()) break;
     }
@@ -1917,8 +1924,8 @@ function copyText(t){
 function widgetSummary(){
   const t=today();
   const hs=habitsOn(t).filter(h=>!isSkip(t,h.id));
-  const tot=hs.reduce((a,h)=>a+habTimes(h.id),0);
-  const done=hs.reduce((a,h)=>a+Math.min(doneN(t,h.id),habTimes(h.id)),0);
+  const tot=hs.reduce((a,h)=>a+plannedCount(t,h.id),0);
+  const done=hs.reduce((a,h)=>a+doneN(t,h.id),0);
   const td=todosOn(t);
   const ym=monthOf(t);
   const spent=sum(outOnly(moneyIn(ym)),r=>r.amount);
@@ -2314,7 +2321,7 @@ function habitRow(o){
   const cur=(rec(view,h.id)||{}).lv||'';
   const curLv=lvs.find(x=>x[0]===cur);
   const sk=isSkip(view,h.id);
-  const cnt=doneN(view,h.id);
+  const cnt=doneN(view,h.id), dayTotal=plannedCount(view,h.id);
   const alwaysTag=(dayOff(view)&&h.always)?'<em class="mn">매일</em>':'';
   const movedTag=(mvGet(view,h.id,ri)!==null)
     ?`<button class="today1" data-unmv="${h.id}:${ri}">오늘만 ✕</button>`:'';
@@ -2327,7 +2334,7 @@ function habitRow(o){
       const push=need>0&&need>=weekLeftDays(view);
       right+=`<span class="wkc ${need===0?'ok':(push?'push':'')}">주 ${wn}/${h.weekN}</span>`;
     }
-    if(tms>1) right+=`<span class="cnt ${cnt>=tms?'full':''}">${Math.min(cnt,tms)}/${tms}</span>`;
+    if(tms>1) right+=`<span class="cnt ${cnt>=dayTotal?'full':''}">${cnt}/${dayTotal}</span>`;
     if(h.track) right+=`<button class="vv" data-time="${h.id}">${v
       ?esc(h.track==='text'?(v.length>9?v.slice(0,9)+'…':v):v+(h.unit||''))
       :'＋'}</button>`;
@@ -2381,8 +2388,8 @@ function header(){
   const greet=lineFor(view);
   const hs=habitsOn(view).filter(h=>!isSkip(view,h.id))
     .filter(h=>!hWeekN(h)||isDone(view,h.id)||mustToday(h,view)),td=todosOn(view);
-  const hTot=hs.reduce((a,h)=>a+habTimes(h.id),0);
-  const hd=hs.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
+  const hTot=hs.reduce((a,h)=>a+plannedCount(view,h.id),0);
+  const hd=hs.reduce((a,h)=>a+doneN(view,h.id),0);
   const tdd=td.filter(x=>x.done).length;
   const spent=sum(outOnly(moneyOn(view)).filter(allocationIsLiving),m=>m.amount);
   const mb=budgetFor(monthOf(view));
@@ -2427,8 +2434,8 @@ function vToday(){
   const nextA=view===today()?alarmsFor(view).find(x=>x.at>=nm):null;
   const hsAll=habitsOn(view).filter(h=>!isSkip(view,h.id))
     .filter(h=>!hWeekN(h)||isDone(view,h.id)||mustToday(h,view));
-  const hTot=hsAll.reduce((a,h)=>a+habTimes(h.id),0);
-  const hd=hsAll.reduce((a,h)=>a+Math.min(doneN(view,h.id),habTimes(h.id)),0);
+  const hTot=hsAll.reduce((a,h)=>a+plannedCount(view,h.id),0);
+  const hd=hsAll.reduce((a,h)=>a+doneN(view,h.id),0);
   const td=todosOn(view), tdd=td.filter(x=>x.done).length;
   const evs=eventsOn(view);
   const out=sum(outOnly(moneyOn(view)).filter(allocationIsLiving),m=>m.amount);
@@ -2510,7 +2517,7 @@ function tabRoutine(){
             ${rMin(h,ri||0,view)?`<em class="mn">${rMin(h,ri||0,view)}분</em>`:''}
             ${h.streakOn!==false&&st>0?`<em class="mn">🔥${st}</em>`:''}
             ${sk?'<em class="lrest">쉼</em>':''}
-            ${(tms>1&&!sk)?`<em class="mn">${Math.min(doneN(view,h.id),tms)}/${tms}</em>`:''}</button>
+            ${(tms>1&&!sk)?`<em class="mn">${doneN(view,h.id)}/${plannedCount(view,h.id)}</em>`:''}</button>
           <button class="lc" data-${sk?'skip':tag}="${sk?h.id:arg}"
             style="${sk?'opacity:.35':''}">${dn?'✓':(sk?'–':'')}</button>
         </div>`;
@@ -4381,7 +4388,7 @@ document.addEventListener('click',ev=>{
     const full=hs.length>0&&hs.every(h=>isDone(view,h.id));
     hs.forEach(h=>{ if(full) delete l.habits[h.id];
       else { const r=l.habits[h.id]||(l.habits[h.id]={at:view===today()?nowHM():'',lv:''});
-        r.oc=Array.from({length:habTimes(h.id)},(_,i)=>i); r.n=r.oc.length;
+        r.oc=plannedRounds(h,view); r.n=r.oc.length;
         if(!r.at&&view===today()) r.at=nowHM(); } });
     save();render(); if(!full) toast('묶음 완료!');
     return;
@@ -4800,11 +4807,11 @@ document.addEventListener('click',ev=>{
     const [gid,hid]=d.mvtoday.split(':');
     const h=habById(hid);
     if(h){
-      const t=habTimes(hid), m=mvOf(view);
       /* 아직 안 한 회차 하나를 오늘만 이 루틴으로 */
-      let idx=0;
-      for(let i=0;i<t;i++){ if(!occIs(view,hid,i)){ idx=i; break; } }
-      m[mvKey(hid,idx)]=gid;
+      const rounds=plannedRounds(h,view);
+      const idx=rounds.find(i=>!occIs(view,hid,i))??rounds[0];
+      if(idx===undefined)return;
+      mvOf(view)[mvKey(hid,idx)]=gid;
       save();closeSheet();render();
       toast(`${md(view)} 하루만 옮겼어요`);
     }
@@ -5134,7 +5141,7 @@ document.addEventListener('click',ev=>{
     const full=so.length>0&&so.every(h=>isDone(view,h.id));
     so.forEach(h=>{ if(full) delete l.habits[h.id];
       else { const r=l.habits[h.id]||(l.habits[h.id]={at:view===today()?nowHM():'',lv:''});
-        r.oc=Array.from({length:habTimes(h.id)},(_,i)=>i); r.n=r.oc.length;
+        r.oc=plannedRounds(h,view); r.n=r.oc.length;
         if(!r.at&&view===today()) r.at=nowHM(); } });
     save();render(); if(!full) toast('습관 완료!');
     return;
