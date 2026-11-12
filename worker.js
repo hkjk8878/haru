@@ -115,7 +115,13 @@ async function syncReadD1(kv,db,room,ops=[],cursor=0){
    db.prepare('CREATE INDEX IF NOT EXISTS haru_sync_room_seq ON haru_sync_ops(room,seq)')
   ]);syncDbReady.add(db);
  }
- const legacyRaw=await kv.get('data:'+room),writes=[];
+ cursor=Number.isSafeInteger(cursor)&&cursor>=0?cursor:0;
+ if(cursor>0&&!ops.length){
+  const head=await db.prepare('SELECT MAX(seq) AS seq FROM haru_sync_ops WHERE room=?').bind(room).first();
+  if(head?.seq===cursor)return {ok:true,protocol:2,backend:'d1',seed:{},hasData:true,ops:[],acked:[],cursor,more:false,at:new Date().toISOString()};
+ }
+ // Bootstrap reads the legacy snapshot. Active legacy uploads are mirrored into D1 by syncKeepLegacy.
+ const legacyRaw=cursor===0?await kv.get('data:'+room):null,writes=[];
  if(legacyRaw){
   const legacy=JSON.parse(legacyRaw),clean=syncClean(legacy.data),digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(clean)));
   const hash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
@@ -134,16 +140,6 @@ async function syncReadD1(kv,db,room,ops=[],cursor=0){
  const selected=rows.slice(0,100),hasData=selected.length>0||!!await db.prepare('SELECT seq FROM haru_sync_ops WHERE room=? LIMIT 1').bind(room).first();
  return {ok:true,protocol:2,backend:'d1',seed:{},hasData,ops:selected.map(row=>JSON.parse(row.payload)),acked:ops.map(op=>op.id),cursor:selected.at(-1)?.seq||cursor,more:rows.length>100,at:new Date().toISOString()};
 }
-
-const TE = new TextEncoder();
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
-};
-const json = (o, s = 200) =>
-  new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json', ...CORS } });
 
 /* ── base64url ── */
 function b64u(buf) {
