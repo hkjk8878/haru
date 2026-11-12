@@ -141,6 +141,14 @@ async function syncReadD1(kv,db,room,ops=[],cursor=0){
  return {ok:true,protocol:2,backend:'d1',seed:{},hasData,ops:selected.map(row=>JSON.parse(row.payload)),acked:ops.map(op=>op.id),cursor:selected.at(-1)?.seq||cursor,more:rows.length>100,at:new Date().toISOString()};
 }
 
+const TE = new TextEncoder();
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type'
+};
+const json = (value, status = 200) => new Response(JSON.stringify(value), {status, headers:{'Content-Type':'application/json',...CORS}});
+
 /* ── base64url ── */
 function b64u(buf) {
   const u = new Uint8Array(buf);
@@ -387,6 +395,7 @@ export default {
       return json({
         ok,
         haru: '알림 서버가 살아 있어요',
+        serverVersion: 'v152',
         syncProtocol: 2,
         syncStorage: 'd1',
         syncReady: !!env.HARU_SYNC_DB,
