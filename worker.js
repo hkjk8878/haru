@@ -264,34 +264,120 @@ function dueAlarms(rec) {
   return out;
 }
 
-/* ── 알림 발송 본체 ── */
-async function runAlarms(env) {
-  if (!env.HARU || !env.VAPID_JWK) return { sent: 0, note: '설정 미완료' };
-  let sent = 0, checked = 0, cursor;
-  do {
-    const list = await env.HARU.list({ prefix: 'sub:', cursor });
-    cursor = list.list_complete ? null : list.cursor;
-    for (const k of list.keys) {
-      const raw = await env.HARU.get(k.name);
-      if (!raw) continue;
-      let rec;
-      try { rec = JSON.parse(raw); } catch (e) { continue; }
-      checked++;
-      const due = dueAlarms(rec);
-      for (const a of due) {
-        try {
-          const status = await push(env, rec.sub, {
-            title: a.title || '하루',
-            body: a.body || '',
-            tag: (a.k || 'haru') + ':' + Date.now()
-          });
-          if (status >= 200 && status < 300) sent++;
-          if (status === 404 || status === 410) await env.HARU.delete(k.name);
-        } catch (e) { /* 한 건 실패해도 나머지는 계속 */ }
+/* Per-device subscriptions and versioned room schedules use D1. */
+const alarmReady = new WeakSet();
+async function alarmDatabase(env) {
+  const db = env.HARU_SYNC_DB;
+  if (!db) throw Error('알림 저장소 연결이 필요해요');
+  if (!alarmReady.has(db)) {
+    await db.batch([
+      db.prepare('CREATE TABLE IF NOT EXISTS haru_alarm_devices (id TEXT PRIMARY KEY, room TEXT, payload TEXT, removed INTEGER NOT NULL DEFAULT 0)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS haru_alarm_schedules (room TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload TEXT NOT NULL)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS haru_alarm_meta (id TEXT PRIMARY KEY, value TEXT NOT NULL)')
+    ]);
+    alarmReady.add(db);
+  }
+  return db;
+}
+async function alarmMigrate(env) {
+  const db = await alarmDatabase(env);
+  if (await db.prepare("SELECT value FROM haru_alarm_meta WHERE id='migrated'").first()) return;
+  const retry = await db.prepare("SELECT value FROM haru_alarm_meta WHERE id='retry'").first();
+  if (retry && Number(retry.value) > Date.now()) return;
+  try {
+    let cursor;
+    do {
+      const page = await env.HARU.list({prefix:'sub:', cursor});
+      for (const key of page.keys) {
+        const raw = await env.HARU.get(key.name);
+        if (!raw) continue;
+        let rec;
+        try { rec = JSON.parse(raw); } catch { continue; }
+        if (!rec.sub?.endpoint) continue;
+        await db.prepare('INSERT OR IGNORE INTO haru_alarm_devices(id,room,payload) VALUES(?,?,?)')
+          .bind(key.name.slice(4), rec.room || '', raw).run();
       }
+      cursor = page.list_complete ? null : page.cursor;
+    } while (cursor);
+    await db.prepare("INSERT OR REPLACE INTO haru_alarm_meta(id,value) VALUES('migrated','1')").run();
+  } catch {
+    await db.prepare("INSERT OR REPLACE INTO haru_alarm_meta(id,value) VALUES('retry',?)")
+      .bind(String(Date.now() + 600000)).run();
+  }
+}
+function alarmRoom(room) {
+  return typeof room === 'string' && /^[A-Za-z0-9._-]{4,40}$/.test(room) ? room : '';
+}
+async function alarmRegister(env, id, rec) {
+  const db = await alarmDatabase(env);
+  await db.prepare("INSERT INTO haru_alarm_devices(id,room,payload,removed) VALUES(?,?,?,0) ON CONFLICT(id) DO UPDATE SET room=COALESCE(NULLIF(excluded.room,''),haru_alarm_devices.room),payload=excluded.payload,removed=0")
+    .bind(id, alarmRoom(rec.room), JSON.stringify(rec)).run();
+}
+async function alarmUnregister(env, id) {
+  const db = await alarmDatabase(env);
+  await db.prepare("INSERT INTO haru_alarm_devices(id,room,payload,removed) VALUES(?,'',NULL,1) ON CONFLICT(id) DO UPDATE SET payload=NULL,removed=1").bind(id).run();
+  await env.HARU.delete('sub:' + id);
+}
+async function alarmSubscription(env, id) {
+  const db = await alarmDatabase(env);
+  const saved = await db.prepare('SELECT payload,removed FROM haru_alarm_devices WHERE id=?').bind(id).first();
+  if (saved) return saved.removed ? null : JSON.parse(saved.payload);
+  const raw = await env.HARU.get('sub:' + id);
+  return raw ? JSON.parse(raw) : null;
+}
+function alarmCleanSchedule(body) {
+  const valid = a => a && typeof a.k === 'string' && typeof a.title === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(a.at);
+  if (!Array.isArray(body.weekly) || !Array.isArray(body.dated) ||
+      body.weekly.length > 1000 || body.dated.length > 20000 ||
+      !body.weekly.every(a => valid(a) && Array.isArray(a.dow) && a.dow.every(d => Number.isInteger(d) && d >= 0 && d < 7)) ||
+      !body.dated.every(a => valid(a) && /^\d{4}-\d{2}-\d{2}$/.test(a.date))) throw Error('알림 시간표 형식을 확인해 주세요');
+  return {tz:typeof body.tz === 'number' ? body.tz : -540, weekly:body.weekly, dated:body.dated};
+}
+async function alarmPublish(env, body) {
+  const room = alarmRoom(body.room);
+  if (!room || !Number.isSafeInteger(body.revision) || body.revision < 0) throw Error('동기화 번호가 필요해요');
+  const db = await alarmDatabase(env), schedule = alarmCleanSchedule(body);
+  // Conditional insertion makes an older or incompletely merged client unable to replace the current schedule.
+  const result = await db.prepare(
+    'INSERT INTO haru_alarm_schedules(room,revision,payload) SELECT ?,?,? WHERE ?=(SELECT COALESCE(MAX(seq),0) FROM haru_sync_ops WHERE room=?) ON CONFLICT(room) DO UPDATE SET revision=excluded.revision,payload=excluded.payload WHERE excluded.revision>=haru_alarm_schedules.revision'
+  ).bind(room,body.revision,JSON.stringify(schedule),body.revision,room).run();
+  return {ok:true, accepted:Number(result.meta?.changes ?? result.changes ?? 0) > 0};
+}
+async function alarmRecipients(env) {
+  await alarmMigrate(env);
+  const db = await alarmDatabase(env);
+  const rows = (await db.prepare('SELECT d.id,d.payload,d.room,s.payload AS schedule,s.revision,(SELECT COALESCE(MAX(seq),0) FROM haru_sync_ops o WHERE o.room=d.room) AS currentRevision FROM haru_alarm_devices d LEFT JOIN haru_alarm_schedules s ON s.room=d.room WHERE d.removed=0').all()).results;
+  const recipients = rows.flatMap(row => {
+    const rec = JSON.parse(row.payload);
+    // New shared-room clients wait for the matching schedule instead of sending stale reminders.
+    if (row.room) {
+      if (!row.schedule || row.revision !== row.currentRevision) return [];
+      Object.assign(rec, JSON.parse(row.schedule));
     }
-  } while (cursor);
-  return { sent, checked };
+    return [{id:row.id, rec}];
+  });
+  const isPhone = rec => rec.device === 'phone' || /\.push\.apple\.com\//.test(rec.sub?.endpoint || '');
+  return recipients.sort((a,b) => Number(isPhone(b.rec)) - Number(isPhone(a.rec)));
+}
+
+/* Send to each registered device using the shared room schedule. */
+async function runAlarms(env) {
+  if (!env.HARU || !env.VAPID_JWK) return {sent:0, checked:0};
+  const recipients = await alarmRecipients(env);
+  let sent = 0;
+  for (const {id,rec} of recipients) {
+    for (const alarm of dueAlarms(rec)) {
+      try {
+        const status = await push(env,rec.sub,{
+          title:alarm.title||'하루',body:alarm.body||'',
+          tag:(alarm.k||'haru')+':'+localParts(rec.tz).date+':'+alarm.at
+        });
+        if (status>=200 && status<300) sent++;
+        if (status===404 || status===410) {await alarmUnregister(env,id);break;}
+      } catch {}
+    }
+  }
+  return {sent,checked:recipients.length};
 }
 
 /* ── 라우팅 ── */
@@ -308,6 +394,8 @@ export default {
         syncProtocol: 2,
         syncStorage: 'd1',
         syncReady: !!env.HARU_SYNC_DB,
+        alarmStorage: 'd1',
+        sharedAlarms: true,
         설정: {
           공개열쇠: !!env.VAPID_PUBLIC,
           비밀열쇠: !!env.VAPID_JWK,
@@ -321,6 +409,11 @@ export default {
       const r = await runAlarms(env);
       const t = localParts(-540);
       return json({ ok: true, 지금: t.hm, 보낸알림: r.sent, 등록기기: r.checked });
+    }
+
+    if (url.pathname === '/alarm-schedule' && req.method === 'POST') {
+      try { return json(await alarmPublish(env, await req.json())); }
+      catch(error) {return json({error:String(error.message||error)},400);}
     }
 
     if (url.pathname === '/sync-v2' && req.method === 'POST') return syncEndpoint(req, env);
@@ -391,21 +484,22 @@ export default {
       if (!b || !b.id || !b.sub || !b.sub.endpoint) return json({ error: 'id와 sub가 필요해요' }, 400);
       const rec = {
         sub: b.sub,
+        room: alarmRoom(b.room),
+        device: b.device==='phone'?'phone':'desktop',
         tz: typeof b.tz === 'number' ? b.tz : 0,
         weekly: (b.weekly || []).slice(0, 300),
         dated: (b.dated || []).slice(0, 500),
         updated: new Date().toISOString()
       };
-      await env.HARU.put('sub:' + b.id, JSON.stringify(rec));
+      await alarmRegister(env,b.id,rec);
       return json({ ok: true, weekly: rec.weekly.length, dated: rec.dated.length });
     }
 
     if (url.pathname === '/test' && req.method === 'POST') {
       let b;
       try { b = await req.json(); } catch (e) { return json({ error: '잘못된 요청' }, 400); }
-      const raw = b && b.id ? await env.HARU.get('sub:' + b.id) : null;
-      if (!raw) return json({ error: '등록된 기기가 없어요. 앱에서 알림 켜기를 먼저 누르세요.' }, 404);
-      const rec = JSON.parse(raw);
+      const rec = b && b.id ? await alarmSubscription(env,b.id) : null;
+      if (!rec) return json({ error: '등록된 기기가 없어요. 앱에서 알림 켜기를 먼저 누르세요.' }, 404);
       const t = localParts(rec.tz);
       const status = await push(env, rec.sub, {
         title: '하루 알림 테스트',
@@ -418,7 +512,7 @@ export default {
     if (url.pathname === '/unregister' && req.method === 'POST') {
       let b;
       try { b = await req.json(); } catch (e) { b = null; }
-      if (b && b.id) await env.HARU.delete('sub:' + b.id);
+      if (b && b.id) await alarmUnregister(env,b.id);
       return json({ ok: true });
     }
 

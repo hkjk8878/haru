@@ -51,7 +51,7 @@ async function haruSyncInit(){
  if(haruConflict&&S.push.url&&S.sync.protocol!==2)S.sync.on=true;
  S.sync.protocol=2;
  if(!S.sync.on)haruSyncSetStatus('동기화 꺼짐 · 기기에 저장됨');
- setInterval(()=>{if(!document.hidden)syncStart();},12000);
+ setInterval(()=>{if(!document.hidden)syncStart();},4000);
 }
 async function haruSyncRequest(body){
  const url=(S.push.url||'').trim().replace(/\/+$/,'');if(!url)throw Error('서버 주소 필요');
@@ -97,10 +97,12 @@ async function haruSyncRun(silent=true){
   haruSyncCapture();const final=HaruSyncCore.replay(haruSyncState.seed,Object.values(haruSyncState.ops));
   haruSyncApplying=true;const keep={};haruDeviceFields.forEach(k=>keep[k]=S[k]);
   S=migrate(final);haruDeviceFields.forEach(k=>{if(keep[k]!==undefined)S[k]=keep[k];});
+  if(Object.hasOwn(final,'notificationEnabled'))S.notify.on=final.notificationEnabled!==false;
   haruSyncObserved=haruSyncCopy(syncPayload());S.sync.base=JSON.stringify(haruSyncObserved);lastSyncJSON=S.sync.base;S.sync.at=nowHM();S.sync.error='';
   haruSyncPersist();save();haruSyncApplying=false;
   const left=Object.keys(haruSyncState.ops).filter(id=>!haruSyncState.acked.includes(id)).length;
-  haruSyncRetry=0;haruSyncSetStatus(left?'기기에 저장됨 · 서버에 보내는 중':'동기화됨 · '+S.sync.at);
+  if(typeof haruPublishAlarms==='function'&&!left)await haruPublishAlarms(room,haruSyncState.cursor||0);
+  haruSyncRetry=0;haruSyncSetStatus(left?'기기에 저장됨 · 서버에 보내는 중':'동기화됨 · '+S.sync.at+(haruAlarmProblem?' · 알림 시간표 재시도 중':''));
   if(!HaruSyncCore.equal(before,syncPayload()))render();if(!silent)toast('변경 내용을 동기화했어요');
   if(left||response.more)haruSyncSchedule(500);return true;
  }catch(e){
@@ -113,6 +115,23 @@ syncAuto=function(){if(S.sync.on){haruSyncCapture();if(haruSyncState&&Object.key
 syncUp=function(silent){return haruSyncRun(silent);};
 syncDown=function(silent){return haruSyncRun(silent);};
 syncStart=function(){return haruSyncRun(true);};
+let haruAlarmRevision='',haruAlarmProblem='';
+async function haruPublishAlarms(room,revision){
+ if(typeof pushSchedule!=='function')return;
+ const key=(S.push.url||'')+'|'+room+'|'+revision+'|'+today();
+ if(haruAlarmRevision===key)return;
+ try{
+  const res=await fetch((S.push.url||'').replace(/\/+$/,'')+'/alarm-schedule',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({room,revision,tz:new Date().getTimezoneOffset(),...pushSchedule()}),
+   signal:AbortSignal.timeout(15000)
+  });
+  const result=await res.json();
+  if(!res.ok)throw Error(result.error||'알림 서버 연결 실패');
+  if(result.accepted){haruAlarmRevision=key;haruAlarmProblem='';}
+  else haruSyncSchedule(1000);
+ }catch(error){haruAlarmProblem=String(error.message||error);}
+}
 window.addEventListener('online',()=>{if(S.sync.on)haruSyncSchedule(0);});
 window.addEventListener('pagehide',()=>haruSyncCapture());
 window.addEventListener('storage',e=>{if(haruSyncState&&e.key===haruSyncKey()&&S.sync.on)haruSyncSchedule(100);});

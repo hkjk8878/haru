@@ -874,7 +874,7 @@ body.pixel .todo-list .todo{background:#F7EBD3}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v149';
+const APP_VER='v150';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2076,64 +2076,13 @@ function pushSchedule(){
     Object.keys(m).forEach(gid=>{ if(m[gid]) shifts.push({d,gid}); });
   });
   const shDays=gid=>shifts.filter(s=>s.gid===gid).map(s=>s.d);
-  S.groups.forEach(g=>{
-    if(!g.notify||!g.time) return;
-    const hs=S.habits.filter(h=>h.groupId===g.id);
-    if(!hs.length) return;
-    const body=hs.map(h=>h.name).join(', ').slice(0,90);
-    const skip=shDays(g.id);
-    const at=toMin(g.time)-+g.notify;
-    if(at>=0) weekly.push(Object.assign({k:'g'+g.id,dow:g.days.slice(),at:toTime(at),
-      title:g.name+' 시간이에요',body},skip.length?{skip}:{}));
-    skip.forEach(d=>{
-      if(!gWeekN(g)&&!g.days.includes(dow(d))) return;
-      const a2=toMin(gTime(g,d))-+g.notify;
-      if(a2<0) return;
-      dated.push({k:'g'+g.id+'_'+d,date:d,at:toTime(a2),title:g.name+' 시간이에요',body});
-    });
-  });
-  S.habits.forEach(h=>{
-    if(!h.notify||!alive(h)) return;
-    const body=h.min?h.min+'분 예정':'';
-    const tms=habTimes(h.id);
-    if(h.from||h.to){
-      for(let i=0;i<120;i++){
-        const d=addDays(t,i);
-        if(d>limit) break;
-        if(!onDay(h,d)) continue;
-        for(let k=0;k<tms;k++){
-          if(!rOn(h,k,d)) continue;
-          const ht=rTime(h,k,d); if(!ht) continue;
-          const at=toMin(ht)-+h.notify; if(at<0) continue;
-          dated.push({k:'h'+h.id+'_'+k,date:d,at:toTime(at),
-            title:h.name+(tms>1?` (${k+1}회차)`:'')+' 시간이에요',body});
-        }
-      }
-    } else {
-      for(let k=0;k<tms;k++){
-        const map={};
-        habDays(h).forEach(dw=>{
-          if(!rOnDow(h,k,dw)) return;
-          const ht=rTimeDow(h,k,dw); if(!ht) return;
-          const at=toMin(ht)-+h.notify; if(at<0) return;
-          (map[at]=map[at]||[]).push(dw);
-        });
-        Object.keys(map).forEach(at=>{
-          const dows=map[at];
-          const ttl=h.name+(tms>1?` (${k+1}회차)`:'')+' 시간이에요';
-          /* 이 날만 옮긴 날 중, 이 회차가 그 묶음에 들어 있는 날만 쉬게 한다 */
-          const skip=shifts.filter(s=>dows.includes(dow(s.d))&&rGroup(h,k,s.d)===s.gid).map(s=>s.d);
-          weekly.push(Object.assign({k:'h'+h.id+'_'+k+at,dow:dows,at:toTime(+at),title:ttl,body},
-            skip.length?{skip}:{}));
-          skip.forEach(d=>{
-            const ht=rTime(h,k,d); if(!ht) return;
-            const a2=toMin(ht)-+h.notify; if(a2<0) return;
-            dated.push({k:'h'+h.id+'_'+k+'_'+d,date:d,at:toTime(a2),title:ttl,body});
-          });
-        });
-      }
+  for(let offset=0;offset<120;offset++){
+    const date=addDays(t,offset);
+    for(const alarm of alarmsFor(date)){
+      if(alarm.kind!=='루틴'&&alarm.kind!=='습관')continue;
+      dated.push({k:alarm.key+'_'+date,date,at:toTime(alarm.at),title:alarm.title,body:alarm.body||''});
     }
-  });
+  }
   S.events.forEach(e=>{
     const base=e.allDay?540:toMin(e.start);
     const body=(e.allDay?'하루 종일':e.start+' 시작')+(e.location?' · '+e.location:'');
@@ -2187,7 +2136,7 @@ function pushSchedule(){
       while(m<0){ m+=1440; date=addDays(date,-1); }
       if(date<t) continue;
       dated.push({k:'f'+f.id+'_'+dd,date,at:toTime(m),
-        title:(date===dd?'':'내일 ')+f.name+' '+won(fixAmt(f,monthOf(dd))),body});
+        title:(date===dd?'':'내일 ')+f.name+' '+won(fixedBudgetItem(f,monthOf(dd))?.amount??fixAmt(f,monthOf(dd))),body});
     }
   });
   S.todos.forEach(td=>{
@@ -2206,7 +2155,7 @@ function pushSchedule(){
         dated.push({k:'s'+x.id,date:x.due,at:'09:00',title:x.title,body:g.title+' 단계 마감일'});
     });
   });
-  return {weekly,dated};
+  return S.notificationEnabled===false?{weekly:[],dated:[]}:{weekly,dated};
 }
 async function pushSubscription(){
   const reg=await navigator.serviceWorker.ready;
@@ -2233,10 +2182,10 @@ async function pushConnect(silent){
     const sch=pushSchedule();
     const res=await fetch(purl()+'/register',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:S.push.id,tz:new Date().getTimezoneOffset(),sub:sub.toJSON(),
+      body:JSON.stringify({id:S.push.id,room:S.sync.room||'',device:IS_IOS||/Android/.test(navigator.userAgent)?'phone':'desktop',tz:new Date().getTimezoneOffset(),sub:sub.toJSON(),
         weekly:sch.weekly,dated:sch.dated})});
     if(!res.ok) throw new Error('서버 응답 '+res.status);
-    schedHash=JSON.stringify(sch);
+    schedHash=JSON.stringify({room:S.sync.room||'',sch});
     S.push.on=true; S.push.at=nowHM(); S.push.err='';
     save();
     if(!silent){ render(); toast('폰 알림이 연결됐어요'); }
@@ -2249,7 +2198,7 @@ async function pushConnect(silent){
 }
 function pushAutoSync(){
   if(!S.push.on||!purl()) return;
-  const now=JSON.stringify(pushSchedule());
+  const now=JSON.stringify({room:S.sync.room||'',sch:pushSchedule()});
   if(now===schedHash) return;
   clearTimeout(pushTimer);
   pushTimer=setTimeout(()=>pushConnect(true),4000);
@@ -3214,11 +3163,11 @@ function installCard(){
 }
 function notifyCard(){
   const st=notifState(), al=alarmsFor(today()), nm=nowMin();
-  return `<div class="card"><header><h2>알림</h2>
+  return `<div class="card"><header><h2>모든 기기 일정 알림</h2>
       <button class="add" data-togglenotify="1" style="color:${S.notify.on?'var(--habit)':'var(--muted)'}">
-        ${S.notify.on?'켜짐':'꺼짐'}</button></header>
+        ${S.notificationEnabled!==false?'켜짐':'꺼짐'}</button></header>
       <div class="empty" style="padding-bottom:8px">
-        이 알림은 <b>이 화면이 열려 있는 동안만</b> 울려요. 화면을 닫아도 울리게 하려면 달력 탭에서 폰 캘린더로 내보내세요.
+        일정별 알림 시간과 켜짐 설정은 연결된 기기에 함께 반영돼요. 알림을 받을 기기에서는 한 번씩 수신 연결과 권한 허용이 필요해요.
         ${st==='unsupported'?' 지금 환경에서는 시스템 알림이 막혀 있어 앱 안 배너로만 뜹니다.':''}
       </div>
       ${S.notify.on?(al.length?
@@ -3230,16 +3179,16 @@ function notifyCard(){
         :'<div class="empty">오늘 예정된 알림이 없어요.</div>')
         :`<button class="addbtn" style="color:var(--habit)" data-togglenotify="1">알림 켜기</button>`}
     </div>
-    <div class="card"><header><h2>폰 알림 (앱을 닫아도 옴)</h2>
+    <div class="card"><header><h2>이 기기에서 알림 받기</h2>
       <span class="count">${S.push.on?'켜짐':'꺼짐'}</span></header>
       <div class="empty" style="padding-bottom:8px">
         ${S.push.on?`알림 서버에 연결됐어요. 루틴·일정·목표를 바꾸면 자동으로 서버에 다시 알려줍니다.
           ${S.push.at?'마지막 동기화 '+S.push.at:''}`
         :S.push.err?`<b style="color:var(--task)">연결 실패: ${esc(S.push.err)}</b><br>설정에서 다시 시도해 보세요.`
-        :'알림 서버를 한 번 연결해 두면, 이 앱을 완전히 닫아도 정해진 시각에 아이폰이 알려줍니다. 설치 문서의 3~7단계를 먼저 하세요.'}
+        :'알림 서버를 한 번 연결해 두면, 앱을 닫아도 서버가 등록된 기기에 알림을 보내요. 이 기기에서 알림 권한을 허용하고 연결하세요.'}
       </div>
       <button class="addbtn" style="color:var(--habit)" data-pushsheet="1">
-        ${S.push.on?'폰 알림 설정 ›':'＋ 폰 알림 연결하기'}</button>
+        ${S.push.on?'이 기기 수신 설정 ›':'＋ 이 기기 알림 연결하기'}</button>
     </div>`;
 }
 function vStat(){
@@ -4231,8 +4180,8 @@ function syncSheet(){
 }
 function pushSheet(){
   const st=S.push.on?'연결됨':'연결 안 됨';
-  openSheet(`<h2>폰 알림 설정</h2>
-    <p class="hint">앱을 닫아도 아이폰이 알려주게 만드는 설정이에요. 현재 상태: <b>${st}</b></p>
+  openSheet(`<h2>이 기기 알림 설정</h2>
+    <p class="hint">현재 기기에 알림을 보내는 설정이에요. 아이폰과 PC에서 각각 연결하세요. 현재 상태: <b>${st}</b></p>
     ${(!IS_STANDALONE&&IS_IOS)?`<p class="err on">아이폰은 <b>홈 화면에 추가한 앱</b>에서만 알림을 받을 수 있어요.
       사파리 공유 → 홈 화면에 추가 후, 그 아이콘으로 열어서 다시 시도해 주세요.</p>`:'<p class="err" id="err"></p>'}
     <div class="field"><label for="f-purl">알림 서버 주소</label>
@@ -4244,7 +4193,7 @@ function pushSheet(){
     <div class="quick" style="margin-top:12px">
       <button type="button" data-pushtest="1">테스트 알림 보내기</button>
       <button type="button" data-pushcheck="1">서버 상태 확인</button>
-      ${S.push.on?'<button type="button" data-pushoff="1">알림 끄기</button>':''}
+      ${S.push.on?'<button type="button" data-pushoff="1">이 기기 수신 끄기</button>':''}
     </div>
     <div class="actions"><button class="cancel" style="flex:1;text-align:center" data-close="1">닫기</button></div>`);
   focusIn('#f-purl');
@@ -4352,7 +4301,7 @@ document.addEventListener('click',ev=>{
   if(d.gotocal){view=d.gotocal;calMonth=monthOf(view);tab='cal';render();window.scrollTo(0,0);return}
   if(d.export){exportICS();return}
   if(d.togglenotify){
-    if(S.notify.on){S.notify.on=false;save();render();toast('알림을 껐어요')} else askNotify();
+    if(S.notificationEnabled!==false){S.notificationEnabled=false;S.notify.on=false;save();render();toast('모든 기기의 일정 알림을 껐어요')} else {S.notificationEnabled=true;askNotify();}
     return;
   }
   if(d.hab){
