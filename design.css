@@ -13,7 +13,7 @@ body.pixel :is(.haru-kpis>div,.haru-actions button,.haru-small,.haru-settings se
 body.px-book :is(.addtodo button,.save){background:#3f7a31;color:#fff}
 body.px-book :is(.seg button.on,.picks button.on,.dayspick button.on){background:#3f7a31;color:#fff}
 .wrap{padding-inline:20px;padding-bottom:calc(118px + env(safe-area-inset-bottom))}
-.home-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:5px 13px 7px;margin:20px 0;min-height:52px;overflow:visible}
+.home-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:5px 15px 7px;margin:20px 0;min-height:52px;overflow:visible}
 body.pixel .home-tabs{border:3px solid var(--ui-border);box-shadow:var(--ui-shadow)}
 .home-tabs button{min-width:0;min-height:35px;gap:3px;white-space:nowrap;padding:3px 0;font-size:12px}
 body.pixel .home-tabs button{font-family:'Galmuri11',sans-serif;font-size:12px;border-width:3px;box-shadow:var(--ui-shadow);background:var(--card)}
@@ -25,22 +25,24 @@ body.pixel .home-tabs button{font-family:'Galmuri11',sans-serif;font-size:12px;b
 .next-alarm .alarmrow .s{display:none}
 .todo-card{padding:15px;margin-top:0;margin-bottom:20px!important}
 .todo-card>header{padding:0;gap:8px}
-.todo-card>header h2{font-size:16px;font-weight:400}
+.todo-card>header h2{font-size:16px;font-weight:400;line-height:22px}
+body.pixel .todo-card :is(h2,.ttl,.todo-title){font-family:'Galmuri14',sans-serif;font-weight:400;font-synthesis:none;font-stretch:normal;letter-spacing:0!important}
+body.pixel :is(.home-tabs button,.next-alarm,.todo-card .addtodo button){font-family:'Galmuri11',sans-serif;font-weight:400;font-synthesis:none;font-stretch:normal}
 .todo-card>header .count{margin-left:auto;font-size:11px}
 .todo-card .todo-list{padding:0;gap:0;margin-top:16px!important}
-.todo-card .todo-list .todo{display:grid;grid-template-columns:36px minmax(0,1fr) auto;padding:12px 0;gap:8px;min-height:60px;background:transparent;border:0;align-items:start}
-.todo-card .check-hit{width:36px;height:24px;min-height:24px;padding:0;align-items:center;position:relative}
-.todo-card .check-hit::after{content:"";position:absolute;inset:-10px 0}
+.todo-card .todo-list .todo{display:grid;grid-template-columns:20px minmax(0,1fr) auto;padding:12px 0 12px 20px;gap:8px;min-height:62px;background:transparent;border:0;align-items:start}
+.todo-card .check-hit{width:20px;height:22px;min-height:22px;padding:0;align-items:center;position:relative}
+.todo-card .check-hit::after{content:"";position:absolute;inset:-10px -8px}
 body.pixel .todo-card .check-hit .box,.todo-card .check-hit .box{width:20px;height:20px;margin:0;border-radius:3px!important;border:1px solid var(--check-fill);box-shadow:none}
 body.pixel .todo-card .todo:not(.done) .check-hit .box,.todo-card .todo:not(.done) .check-hit .box{background:#fff;border-color:var(--check-fill);color:transparent}
-.todo-card .todo-list .ttl{padding:0;line-height:24px;min-height:24px;font-size:16px;overflow-wrap:anywhere;text-align:left;align-self:start}
+.todo-card .todo-list .ttl{padding:0;line-height:22px;min-height:38px;font-size:16px;overflow-wrap:anywhere;text-align:left;align-self:start;gap:2px}
 .todo-card .todo-title{width:100%;word-break:keep-all}
-.todo-card .todo-list .ttl .tm2{line-height:16px;margin:0;font-size:10px;color:var(--muted);letter-spacing:1px}
-.todo-card .todo-list .mvs{margin:0;padding:0;gap:4px;flex-direction:row;align-items:center;height:24px}
+.todo-card .todo-list .ttl .tm2{font-family:'Galmuri14',sans-serif;line-height:14px;margin:0;font-size:10px;color:var(--muted);letter-spacing:1px!important;font-weight:400}
+.todo-card .todo-list .mvs{margin:0;padding:0;gap:4px;flex-direction:row;align-items:center;height:22px}
 body.pixel .todo-card .mvs button,.todo-card .mvs button{width:23px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;background:transparent;border:0;box-shadow:none;overflow:visible}
 .todo-card .mvs img{width:19px;height:21px;margin-top:0;flex:none}
 .todo-card .mvs button:disabled{opacity:.3}
-.todo-card .addtodo{padding:16px 0 3px;gap:8px;border:0;align-items:center}
+.todo-card .addtodo,body.pixel .todo-card .addtodo{padding:0;margin-top:16px;gap:8px;border:0;align-items:center}
 .todo-card .addtodo input{width:0;min-width:0;height:45px;border:3px solid var(--ui-border);border-radius:5px;padding:8px 10px;background:var(--card);box-shadow:var(--ui-shadow)}
 body.pixel .todo-card .addtodo input{border-width:3px;box-shadow:var(--ui-shadow)}
 .todo-card .addtodo button,body.pixel .todo-card .addtodo button{width:45px;height:45px;min-width:45px;padding:0;display:grid;place-items:center;text-align:center;line-height:1;background:var(--check-fill);color:#fff;border:3px solid var(--ui-border);border-radius:5px;box-shadow:var(--ui-shadow);font-size:12px;font-weight:400;white-space:nowrap}
@@ -52,4 +54,4 @@ nav .inner{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));max-width:
 nav button{min-width:0;min-height:50px;padding:6px 0;gap:5px;justify-content:center;text-align:center;font-size:10px;white-space:nowrap}
 nav button u{display:grid;place-items:center;width:25px;height:28px;margin-inline:auto;font-size:19px;line-height:1}
 body.pixel nav button.on u{color:var(--pxSelInk);background:var(--pxSel);border-radius:3px!important}
-@media(max-width:360px){.wrap{padding-inline:14px}.home-tabs{padding-inline:6px;gap:5px}.home-tabs button,body.pixel .home-tabs button{font-size:11px}.home-tabs button u{display:inline!important;font-size:8px}.todo-card{padding:12px}.todo-card .check-hit{width:36px}.todo-card .todo-list .ttl{font-size:15px}}
+@media(max-width:360px){.wrap{padding-inline:14px}.home-tabs{padding-inline:4px;gap:3px}.home-tabs button,body.pixel .home-tabs button{font-size:11px;gap:2px}.home-tabs button u{display:inline!important;font-size:9px}.todo-card{padding:15px}.todo-card .todo-list .todo{padding-left:8px}}
