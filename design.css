@@ -69,3 +69,11 @@ nav button u{display:grid;place-items:center;width:25px;height:28px;margin-inlin
 body.pixel nav button.on u{color:var(--pxSelInk);background:var(--pxSel);border-radius:3px!important}
 @media(max-width:360px){.wrap{padding-inline:14px}.home-tabs{padding-inline:4px;gap:3px}.home-tabs button,body.pixel .home-tabs button{font-size:11px;gap:2px}.home-tabs button u{display:inline!important;font-size:9px}.todo-card{padding:15px}.todo-card .todo-list .todo{padding-left:8px}}
 @media(max-width:360px){.home-tabs button:has(u){flex-direction:column;gap:0;line-height:13px}.home-tabs button u{line-height:11px}}
+/* Desktop gets more room without scaling text or the small arrow controls. */
+@media(min-width:900px){
+  body:has(.todo-card) #app,body:has(.todo-card) nav .inner{max-width:640px}
+  body:has(.todo-card) #app{padding-inline:24px}
+  body:has(.todo-card) .home-tabs{grid-template-columns:repeat(5,minmax(0,1fr));padding-inline:15px;gap:12px}
+  .todo-card{padding:24px}
+  .todo-card .todo-list .todo{padding-left:12px;padding-right:12px}
+}
