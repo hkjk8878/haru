@@ -1,0 +1,53 @@
+/* Figma 119:230: shared surface tokens and responsive, equal navigation slots. */
+body{--ui-radius:5px;--ui-border:var(--line);--ui-shadow:0 3px 0 var(--ui-border)}
+body.pixel{--ui-border:var(--pxB)}
+body.px-book{--ink:#3a2a22;--card2:#f7ebd3;--pxBtn:#f7ebd3;--pxHi:transparent}
+body.pixel :is(.card,.grp,.seg,.haru-board,.haru-kpis>div,.haru-table-wrap,.haru-settings select,.haru-actions button,.haru-small,.haru-insight,.haru-summary,.sec,.sec2,.sheet,.field input,.field select,.field textarea,.addtodo input,.addtodo button,.pill,.addbtn,.save,.cancel,.del,.allbtn,.catchip,.quick button,.picks button,.dayspick button,.seg button,.mvs button,.fadd,.rest,.vv,.at,.cnt,.mact,.medit,.svtog){border-radius:var(--ui-radius)!important}
+body.pixel :is(.card,.grp,.haru-board){border:3px solid var(--ui-border);box-shadow:var(--ui-shadow);background:var(--card)}
+body.pixel .sheet{box-shadow:0 -3px 0 var(--ui-border)}
+body.pixel :is(.gauge,.arrow,.modebar,.dday,.yearbar,.note,.alloc-living-summary>div,.alloc-note,.alloc-kind button,.alloc-plan-row input){border-radius:var(--ui-radius)!important}
+body.pixel :is(.gauge,.arrow,.modebar,.dday){border:3px solid var(--ui-border);box-shadow:var(--ui-shadow);background:var(--card)}
+body.pixel .alloc-living-meter i{background:var(--task)}
+body.pixel .haru-insight{border-left-color:var(--pxSel)}
+body.pixel :is(.haru-kpis>div,.haru-actions button,.haru-small,.haru-settings select,.haru-table-wrap){border-color:var(--ui-border)}
+body.px-book :is(.addtodo button,.save){background:#3f7a31;color:#fff}
+body.px-book :is(.seg button.on,.picks button.on,.dayspick button.on){background:#3f7a31;color:#fff}
+.wrap{padding-inline:20px;padding-bottom:calc(118px + env(safe-area-inset-bottom))}
+.home-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:5px 13px 7px;margin:20px 0;min-height:52px;overflow:visible}
+body.pixel .home-tabs{border:3px solid var(--ui-border);box-shadow:var(--ui-shadow)}
+.home-tabs button{min-width:0;min-height:35px;gap:3px;white-space:nowrap;padding:3px 0;font-size:12px}
+body.pixel .home-tabs button{font-family:'Galmuri11',sans-serif;font-size:12px;border-width:3px;box-shadow:var(--ui-shadow);background:var(--card)}
+.home-tabs button u{font-size:9px;opacity:1}
+.next-alarm{margin-top:20px!important;margin-bottom:20px!important}
+.next-alarm .alarmrow{padding:12px 15px;min-height:46px;gap:10px}
+.next-alarm .alarmrow .t{font-size:13px;letter-spacing:1px}
+.next-alarm .alarmrow .n{font-size:13px;min-width:0;word-break:keep-all}
+.next-alarm .alarmrow .s{display:none}
+.todo-card{padding:15px;margin-top:0;margin-bottom:20px!important}
+.todo-card>header{padding:0;gap:8px}
+.todo-card>header h2{font-size:16px;font-weight:400}
+.todo-card>header .count{margin-left:auto;font-size:11px}
+.todo-card .todo-list{padding:0;gap:0;margin-top:16px!important}
+.todo-card .todo-list .todo{padding:12px 0;gap:0;min-height:62px;background:transparent;border:0;align-items:flex-start}
+.todo-card .check-hit{width:44px;height:44px;padding:0;align-items:start}
+body.pixel .todo-card .check-hit .box,.todo-card .check-hit .box{width:20px;height:20px;margin:2px 0 0;border-radius:3px!important;border:1px solid var(--check-fill);box-shadow:none}
+body.pixel .todo-card .todo:not(.done) .check-hit .box,.todo-card .todo:not(.done) .check-hit .box{background:#fff;border-color:var(--check-fill);color:transparent}
+.todo-card .todo-list .ttl{padding:0;line-height:24px;min-height:44px;font-size:16px;overflow-wrap:anywhere}
+.todo-card .todo-title{width:100%;word-break:keep-all}
+.todo-card .todo-list .ttl .tm2{line-height:16px;margin:0;font-size:10px;color:var(--muted);letter-spacing:1px}
+.todo-card .todo-list .mvs{margin:0 0 0 8px;padding:0;gap:0;flex-direction:row;align-items:start}
+body.pixel .todo-card .mvs button,.todo-card .mvs button{width:23px;height:44px;padding:0;display:flex;align-items:flex-start;justify-content:center;background:transparent;border:0;box-shadow:none;overflow:visible}
+.todo-card .mvs img{width:19px;height:21px;margin-top:0;flex:none}
+.todo-card .mvs button:disabled{opacity:.3}
+.todo-card .addtodo{padding:16px 0 3px;gap:8px;border:0;align-items:center}
+.todo-card .addtodo input{width:0;min-width:0;height:45px;border:3px solid var(--ui-border);border-radius:5px;padding:8px 10px;background:var(--card);box-shadow:var(--ui-shadow)}
+body.pixel .todo-card .addtodo input{border-width:3px;box-shadow:var(--ui-shadow)}
+.todo-card .addtodo button{width:45px;height:45px;min-width:45px;padding:0;display:grid;place-items:center;background:var(--check-fill);color:#fff;border:3px solid var(--ui-border);border-radius:5px;box-shadow:var(--ui-shadow);font-size:12px}
+.todo-card .overdue{margin-top:12px;font-size:12px}
+.todo-card.wkcard>.empty{padding:8px 0 0!important}
+nav{padding:14px 0 calc(14px + env(safe-area-inset-bottom));min-height:82px}
+nav .inner{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));max-width:520px;width:100%;padding-inline:8px;gap:0;margin-inline:auto}
+nav button{min-width:0;min-height:50px;padding:6px 0;gap:5px;justify-content:center;text-align:center;font-size:10px;white-space:nowrap}
+nav button u{display:grid;place-items:center;width:25px;height:28px;margin-inline:auto;font-size:19px;line-height:1}
+body.pixel nav button.on u{color:var(--pxSelInk);background:var(--pxSel);border-radius:3px!important}
+@media(max-width:360px){.wrap{padding-inline:14px}.home-tabs{padding-inline:6px;gap:5px}.home-tabs button,body.pixel .home-tabs button{font-size:11px}.home-tabs button u{display:inline!important;font-size:8px}.todo-card{padding:12px}.todo-card .check-hit{width:36px}.todo-card .todo-list .ttl{font-size:15px}}

@@ -1,7 +1,7 @@
 /* 하루 — 서비스워커
    앱 파일을 캐시해 두어 인터넷이 없어도 열리게 합니다.
    index.html을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요. */
-const VERSION = 'haru-v152';
+const VERSION = 'haru-v153';
 const FILES = [
   './',
   './index.html',
@@ -14,6 +14,9 @@ const FILES = [
   './ui-state.js',
   './upgrade.js',
   './upgrade.css',
+  './design.css',
+  './assets/todo-up.svg',
+  './assets/todo-down.svg',
   './manifest.webmanifest',
   './keygen.html',
   './icon-192-v24.png',
