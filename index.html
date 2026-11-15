@@ -875,7 +875,7 @@ body.pixel .todo-list .todo{background:#F7EBD3}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v156';
+const APP_VER='v157';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2520,7 +2520,7 @@ function tabTodo(){
   const steps=[];
   S.goals.forEach(g=>(g.steps||[]).forEach(x=>{if(x.due&&x.due<=view&&!x.done) steps.push({g,s:x})}));
   return `<div class="card todo-card"><header><h2>${md(view)}의 할 일</h2>
-      <span class="count">${list.filter(t=>t.done).length}/${list.length}</span></header>
+      </header>
       ${pastCount?`<div class="overdue"><p>지난 할 일 ${pastCount}개
         <button data-haru="organize">정리하기</button></p></div>`:''}
       <div class="todo-list" style="margin-top:12px">
@@ -5279,6 +5279,7 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
 <script src="allocation-ui.js"></script>
 <script src="sync-core.js"></script>
 <script src="sync-client.js"></script>
+<script src="design-ui.js"></script>
 <script>load();</script>
 </body>
 </html>

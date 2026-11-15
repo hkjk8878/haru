@@ -22,7 +22,7 @@ body.pixel .home-tabs button{font-family:'Galmuri11',sans-serif;font-size:12px;b
 .home-tabs button u{font-size:9px;opacity:1}
 .next-alarm{margin-top:20px!important;margin-bottom:20px!important}
 .next-alarm .alarmrow{padding:12px 15px;min-height:46px;gap:10px}
-.next-alarm .alarmrow .t{font-size:13px;letter-spacing:1px}
+.next-alarm .alarmrow .t{font-size:13px;font-weight:400;width:auto;letter-spacing:1.3px!important}
 .next-alarm .alarmrow .n{font-size:13px;min-width:0;word-break:keep-all}
 .next-alarm .alarmrow .s{display:none}
 .todo-card{padding:15px;margin-top:0;margin-bottom:20px!important}
@@ -52,6 +52,9 @@ body.pixel .todo-card .addtodo input{border-width:3px;box-shadow:var(--ui-shadow
 .todo-card .overdue{margin-top:12px;font-size:12px}
 .home-tabs button,body.pixel .home-tabs button{line-height:16px;font-weight:400;text-align:center;align-items:center;justify-content:center}
 .home-tabs button u{line-height:16px}
+body.pixel .home-tabs button{color:var(--ink)}
+body.pixel .home-tabs button.on{color:#fff}
+body.pixel .todo-card .mvs button:disabled{opacity:.55}
 nav{padding:14px 0 calc(14px + env(safe-area-inset-bottom));min-height:82px}
 nav .inner{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));max-width:520px;width:100%;padding-inline:8px;gap:0;margin-inline:auto}
 nav button{min-width:0;min-height:50px;padding:6px 0;gap:5px;justify-content:center;text-align:center;font-size:10px;white-space:nowrap}

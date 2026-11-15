@@ -1,6 +1,6 @@
 <svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="19" height="21" viewBox="0 0 19 21" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g id="reader-button" filter="url(#filter0_d_0_58)">
-<rect x="1" y="1" width="17" height="17" rx="4" stroke="#3A2A22" stroke-width="2" shape-rendering="crispEdges"/>
+<rect x="1" y="1" width="17" height="17" rx="4" stroke="#3A2A22" stroke-width="2" shape-rendering="geometricPrecision"/>
 <path id="arrow" d="M9.5 13.25L5.16987 5.75H13.8301L9.5 13.25Z" fill="#3A2A22"/>
 </g>
 <defs>
