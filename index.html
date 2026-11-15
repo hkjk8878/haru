@@ -875,7 +875,7 @@ body.pixel .todo-list .todo{background:#F7EBD3}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v157';
+const APP_VER='v158';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2390,9 +2390,9 @@ function vToday(){
   const evs=eventsOn(view);
   const out=sum(outOnly(moneyOn(view)).filter(allocationIsLiving),m=>m.amount);
   const tabs=[['routine','루틴',hTot?`${hd}/${hTot}`:''],
-              ['todo','할 일',td.length?`${tdd}/${td.length}`:''],
-              ['event','일정',evs.length?String(evs.length):''],
-              ['money','지출',out?shortWon(out):''],
+              ['todo','할일',td.length?`${tdd}/${td.length}`:''],
+              ['event','일정',''],
+              ['money','지출',''],
               ['note','일기',(log(view).note||'').trim()?'✓':'']];
   const am=activeMode(view);
   return header()+
@@ -2406,7 +2406,7 @@ function vToday(){
       <span class="n">다음 알림: ${esc(nextA.label)}</span>
       <span class="s">${nextA.kind}</span></div></div>`:'')+
     `<div class="seg seg4 home-tabs">${tabs.map(([k,l,badge])=>
-      `<button data-htab="${k}" class="${homeTab===k?'on':''}">${l}${badge?`<u>${badge}</u>`:''}</button>`).join('')}</div>`+
+      `<button data-htab="${k}" class="${homeTab===k?'on':''} ${badge.length>3?'wide-count':''}"><span class="tab-label">${l}</span>${badge?`<u>${badge}</u>`:''}</button>`).join('')}</div>`+
     (homeTab==='routine'?tabRoutine()
      :homeTab==='todo'?tabTodo()
      :homeTab==='event'?tabEvent()
@@ -2530,8 +2530,8 @@ function tabTodo(){
         <button class="check-hit" data-todo="${t.id}" aria-label="완료" aria-pressed="${!!t.done}"><span class="box" aria-hidden="true">✓</span></button>
         <button class="ttl" data-edittodo="${t.id}"><span class="todo-title">${esc(t.title)}</span>${t.time||t.notify?`<em class="tm2">${t.time?esc(t.time):''}${t.notify?' 🔔':''}</em>`:''}</button>
         ${list.length>1?`<span class="mvs">
-          <button ${i===0?'disabled':`data-tswap="${t.id}:${list[i-1].id}"`} aria-label="위로 이동"><img src="assets/todo-up.svg" alt="" width="19" height="21"></button>
-          <button ${i===list.length-1?'disabled':`data-tswap="${t.id}:${list[i+1].id}"`} aria-label="아래로 이동"><img src="assets/todo-down.svg" alt="" width="19" height="21"></button></span>`:''}
+          <button ${i===0?'disabled':`data-tswap="${t.id}:${list[i-1].id}"`} aria-label="위로 이동"><span class="todo-move-icon up" aria-hidden="true"></span></button>
+          <button ${i===list.length-1?'disabled':`data-tswap="${t.id}:${list[i+1].id}"`} aria-label="아래로 이동"><span class="todo-move-icon down" aria-hidden="true"></span></button></span>`:''}
       </div>`).join('')}
       ${(!list.length&&!steps.length)?'<div class="empty">오늘 꼭 끝낼 한 가지만 적어 보세요.</div>':''}</div>
       <div class="addtodo"><input id="todoInput" type="text" placeholder="할 일 적기" maxlength="80">
@@ -5279,7 +5279,6 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
 <script src="allocation-ui.js"></script>
 <script src="sync-core.js"></script>
 <script src="sync-client.js"></script>
-<script src="design-ui.js"></script>
 <script>load();</script>
 </body>
 </html>
