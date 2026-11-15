@@ -13,6 +13,8 @@ body.pixel :is(.haru-kpis>div,.haru-actions button,.haru-small,.haru-settings se
 body.px-book :is(.addtodo button,.save){background:#3f7a31;color:#fff}
 body.px-book :is(.seg button.on,.picks button.on,.dayspick button.on){background:#3f7a31;color:#fff}
 .wrap{padding-inline:20px;padding-bottom:calc(118px + env(safe-area-inset-bottom))}
+/* The Figma frame is 393px wide. Keep its proportions in wider app windows. */
+body:has(.todo-card) #app,body:has(.todo-card) nav .inner{max-width:393px}
 .home-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:5px 15px 7px;margin:20px 0;min-height:52px;overflow:visible}
 body.pixel .home-tabs{border:3px solid var(--ui-border);box-shadow:var(--ui-shadow)}
 .home-tabs button{min-width:0;min-height:35px;gap:3px;white-space:nowrap;padding:3px 0;font-size:12px}
@@ -41,6 +43,7 @@ body.pixel .todo-card .todo:not(.done) .check-hit .box,.todo-card .todo:not(.don
 .todo-card .todo-list .mvs{margin:0;padding:0;gap:4px;flex-direction:row;align-items:center;height:22px}
 body.pixel .todo-card .mvs button,.todo-card .mvs button{width:23px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;background:transparent;border:0;box-shadow:none;overflow:visible}
 .todo-card .mvs img{width:19px;height:21px;margin-top:0;flex:none}
+body.pixel .todo-card .mvs img{image-rendering:auto}
 .todo-card .mvs button:disabled{opacity:.3}
 .todo-card .addtodo,body.pixel .todo-card .addtodo{padding:0;margin-top:16px;gap:8px;border:0;align-items:center}
 .todo-card .addtodo input{width:0;min-width:0;height:45px;border:3px solid var(--ui-border);border-radius:5px;padding:8px 10px;background:var(--card);box-shadow:var(--ui-shadow)}
