@@ -1,4 +1,5 @@
 /* Figma 119:230: shared surface tokens and responsive, equal navigation slots. */
+html{overflow-y:scroll;scrollbar-gutter:stable}
 body{--ui-radius:5px;--ui-border:var(--line);--ui-shadow:0 3px 0 var(--ui-border)}
 body.pixel{--ui-border:var(--pxB)}
 body.px-book{--ink:#3a2a22;--card2:#f7ebd3;--pxBtn:#f7ebd3;--pxHi:transparent}
@@ -14,7 +15,7 @@ body.px-book :is(.addtodo button,.save){background:#3f7a31;color:#fff}
 body.px-book :is(.seg button.on,.picks button.on,.dayspick button.on){background:#3f7a31;color:#fff}
 .wrap{padding-inline:20px;padding-bottom:calc(118px + env(safe-area-inset-bottom))}
 /* The Figma frame is 393px wide. Keep its proportions in wider app windows. */
-body:has(.todo-card) #app,body:has(.todo-card) nav .inner{max-width:393px}
+body:has(.home-tabs) #app,body:has(.home-tabs) nav .inner{max-width:393px}
 .home-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,58px));justify-content:center;gap:8px;padding:5px 5px 7px;margin:20px 0;min-height:52px;overflow:visible}
 body.pixel .home-tabs{border:3px solid var(--ui-border);box-shadow:var(--ui-shadow)}
 .home-tabs button{min-width:0;min-height:35px;gap:3px;white-space:nowrap;padding:3px 0;font-size:12px}
@@ -71,9 +72,9 @@ body.pixel nav button.on u{color:var(--pxSelInk);background:var(--pxSel);border-
 @media(max-width:360px){.home-tabs button:has(u){flex-direction:column;gap:0;line-height:13px}.home-tabs button u{line-height:11px}}
 /* Desktop gets more room without scaling text or the small arrow controls. */
 @media(min-width:900px){
-  body:has(.todo-card) #app,body:has(.todo-card) nav .inner{max-width:640px}
-  body:has(.todo-card) #app{padding-inline:24px}
-  body:has(.todo-card) .home-tabs{grid-template-columns:repeat(5,minmax(0,1fr));padding-inline:15px;gap:12px}
+  body:has(.home-tabs) #app,body:has(.home-tabs) nav .inner{max-width:640px}
+  body:has(.home-tabs) #app{padding-inline:24px}
+  body:has(.home-tabs) .home-tabs{grid-template-columns:repeat(5,minmax(0,1fr));padding-inline:15px;gap:12px}
   .todo-card{padding:24px}
   .todo-card .todo-list .todo{padding-left:12px;padding-right:12px}
 }
