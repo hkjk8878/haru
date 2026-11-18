@@ -875,7 +875,7 @@ body.pixel .todo-list .todo{background:#F7EBD3}
 
 <script>
 /* ══════════ 기본 ══════════ */
-const APP_VER='v160';
+const APP_VER='v161';
 const KEY='haru:v1';
 const DAYS=['일','월','화','수','목','금','토'];
 const BYDAY=['SU','MO','TU','WE','TH','FR','SA'];
@@ -2243,7 +2243,7 @@ function render(){
   $('#app').innerHTML= tab==='today'?vToday():tab==='routine'?vRoutine()
     :tab==='cal'?vCal():tab==='money'?vMoney():tab==='set'?vSet():vStat();
   $('#nav').innerHTML=`<div class="inner">${[
-    ['today','◴','오늘'],['routine','◇','루틴'],['cal','▤','달력'],
+    ['today','◴','오늘'],['cal','▤','달력'],['routine','◇','루틴'],
     ['money','₩','가계부'],['stat','◗','통계'],['set','⚙','설정']
   ].map(([k,i,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><u>${i}</u>${l}</button>`).join('')}</div>`;
   if(focusTodo){focusTodo=false;const el=$('#todoInput');if(el)el.focus()}
@@ -2364,7 +2364,7 @@ function header(){
         <div class="bar"><i style="width:${hTot?hd/hTot*100:0}%"></i></div></div>
       <div class="gauge g-task"><div class="lab">할 일 <b>${tdd}<s>/${td.length}</s></b></div>
         <div class="bar"><i style="width:${td.length?tdd/td.length*100:0}%"></i></div></div>
-      <button class="gauge g-money" data-tab="money"><div class="lab">생활비 <b>${shortWon(spent)}<s>원</s></b></div>
+      <button class="gauge g-money" data-tab="money"><div class="lab">지출 <b>${shortWon(spent)}<s>원</s></b></div>
         <div class="bar"><i style="width:${daily?Math.min(100,spent/daily*100):0}%"></i></div></button>
     </div></div>`;
 }
@@ -2578,7 +2578,7 @@ function tabMoney(){
   const inc=sum(incOnly(rows),m=>m.amount);
   return `<div class="card"><header><h2>${md(view)}의 지출</h2>
       <span class="count">${won(out)}${sav?' · 저축 '+won(sav):''}${inc?' · 수입 '+won(inc):''}</span>
-      <button class="add" data-newtx="1" style="color:var(--goal)">＋ 기록</button></header>
+      <button class="add" data-newtx="1" style="color:var(--goal)">＋ 추가</button></header>
       ${rows.length?rows.map(txRow).join(''):'<div class="empty">기록이 없어요.</div>'}
       <button class="addbtn" data-tab="money">가계부 전체 보기 ›</button></div>`;
 }
@@ -2999,11 +2999,11 @@ function vMoney(){
       const rs=realRows.filter(r=>r.date===d);
       return `<div class="daygrp"><span>${md(d)} ${DAYS[dow(d)]}</span>
         <span>${won(sum(outOnly(rs),r=>r.amount))}</span></div>`+rs.map(txRow).join('');
-    }).join(''):'<div class="empty">＋ 기록으로 첫 지출을 남겨 보세요.</div>';
+    }).join(''):'<div class="empty">＋ 추가로 첫 지출을 남겨 보세요.</div>';
 
   return `<div class="top"><div class="datenav"><div><h1>가계부</h1>
       <p class="sub">쓴 돈과 남은 예산을 하루 단위로 봅니다.</p></div>
-      <button class="pill g" data-newtx="1">＋ 기록</button></div></div>
+      <button class="pill g" data-newtx="1">＋ 추가</button></div></div>
     <div class="card">
       <div class="calnav"><button data-mmonth="${prevM}">‹</button><b>${y}년 ${m}월</b>
         <button class="r" data-mmonth="${nextM}">›</button></div>
@@ -4093,7 +4093,7 @@ function txSheet(id){
   moneyType=m?m.type:'out';
   const first=S.mcats.find(c=>c.type===moneyType);
   sheetPick.mcat=m?m.catId:(first?first.id:'');
-  openSheet(`<h2>${m?'기록 수정':'가계부 기록'}</h2><p class="err" id="err"></p>
+  openSheet(`<h2>${m?'기록 수정':'가계부 추가'}</h2><p class="err" id="err"></p>
     <div class="seg" style="margin:0 0 14px;box-shadow:none;background:var(--paper)">
       <button data-mtype="out" class="${moneyType==='out'?'on':''}">지출</button>
       <button data-mtype="in" class="${moneyType==='in'?'on':''}">수입</button></div>

@@ -95,7 +95,7 @@ function haruGoalCard(){
 function haruMoneyBoard(a){
  const delta=n=>n===null?'—':(n>0?'+':'')+won(n);
  const biggest=a.categories.find(c=>c.amount>0), c=a.candidate;
- return `<div class="top"><div class="datenav"><h1>가계부</h1><button class="pill g" data-newtx="1">＋ 기록</button></div></div>
+ return `<div class="top"><div class="datenav"><h1>가계부</h1><button class="pill g" data-newtx="1">＋ 추가</button></div></div>
  <section class="haru-board"><div class="calnav"><button data-mmonth="${prevYM(moneyMonth)}" aria-label="지난달">‹</button><b>${Number(moneyMonth.slice(0,4))}년 ${Number(moneyMonth.slice(5))}월</b><button data-mmonth="${addYM(moneyMonth,1)}" aria-label="다음달">›</button></div>
  <div class="haru-living-kpis"><div><span>생활비 예산</span><strong>${a.budget?won(a.budget):'미설정'}</strong></div><div><span>쓴 생활비</span><strong>${won(a.spent)}</strong></div><div class="${a.remaining<0?'haru-danger':''}"><span>남은 생활비</span><strong>${a.remaining===null?'—':won(a.remaining)}</strong></div></div>
  <div class="haru-actions"><button data-budget="1">예산 수정</button></div><p class="haru-muted">고정비·저축 제외</p></section>

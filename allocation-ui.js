@@ -53,7 +53,7 @@ vMoney=function(){
  const over=remaining<0;
  const usage=living.planned>0?Math.max(0,Math.min(100,living.spent/living.planned*100)):0;
 
- return `<div class="top"><div class="datenav"><h1>가계부</h1><button class="pill g" data-newtx="1">＋ 기록</button></div></div>
+ return `<div class="top"><div class="datenav"><h1>가계부</h1><button class="pill g" data-newtx="1">＋ 추가</button></div></div>
  <section class="haru-board alloc-income"><div class="calnav"><button data-mmonth="${prevYM(moneyMonth)}" aria-label="지난달">‹</button><b>${moneyMonth.slice(0,4)}년 ${Number(moneyMonth.slice(5))}월</b><button data-mmonth="${addYM(moneyMonth,1)}" aria-label="다음달">›</button></div>
  <h2 class="alloc-living-title">이번 달 생활비</h2>
  <div class="alloc-living-summary">
@@ -68,11 +68,11 @@ vMoney=function(){
  <div class="alloc-groups">${Object.entries(p).map(([key,g])=>{
   const v=a.groups[key];
   return `<details class="haru-board alloc-group" id="alloc-group-${key}" style="--alloc-color:${g.color}"><summary><span class="alloc-group-title"><b>${g.name}</b><span>${key==='saving'?'월 목표':key==='reserve'?'남은 예산':'월 예산'}</span></span><strong class="alloc-group-budget">${allocationMoney(key==='reserve'?v.remaining:v.planned)}</strong><span class="alloc-group-progress">${key==='reserve'?`<span>월 예산 <b>${allocationMoney(v.planned)}</b></span><span>이번 달 납입 <b>${allocationMoney(v.deposited||0)}</b></span>`:''}<span>${g.verb} <b>${allocationMoney(key==='reserve'?v.spent:v.actual)}</b></span>${key!=='reserve'&&key!=='saving'?`<span class="${v.remaining<0?'haru-danger':''}">${v.remaining<0?'초과':'남음'} <b>${allocationMoney(Math.abs(v.remaining))}</b></span>`:''}</span></summary>
-  <div class="alloc-items">${key==='reserve'?'<div class="haru-actions"><button data-alloc="item-budget" data-item="reserve-total">월 예산 수정</button><button data-alloc="record-reserve">사용 기록</button></div>':S.allocation.items.filter(i=>i.group===key).map(i=>allocationItemRow(a.items[i.id],a)).join('')}</div>
+  <div class="alloc-items">${key==='reserve'?'<div class="haru-actions"><button data-alloc="item-budget" data-item="reserve-total">월 예산 수정</button><button data-alloc="record-reserve">추가</button></div>':S.allocation.items.filter(i=>i.group===key).map(i=>allocationItemRow(a.items[i.id],a)).join('')}</div>
   ${key==='saving'&&a.achievedMonth?`<p class="haru-muted">비상금 목표 달성 · 다음 달부터 결혼자금 목표에 합산</p>`:''}</details>`;
  }).join('')}</div>
  <details class="haru-board haru-fold" id="alloc-metrics"><summary>월 요약</summary><div class="alloc-income-pair"><span>실제 소비</span><b>${allocationMoney(a.spending)}</b></div><div class="alloc-income-pair"><span>저축·투자 / 실제 수입</span><b>${a.savingRate===null?'수입 기록 필요':(a.savingRate*100).toFixed(1)+'%'}</b></div><div class="haru-actions"><button data-alloc="csv">기록 CSV</button><button data-alloc="plan-csv">예산표 CSV</button><button data-alloc="openings">시작 잔액</button></div></details>
- <section class="card" id="alloc-records"><header><h2>${allocationRecordScope==='review'?'항목 미지정':'전체 기록'}</h2><span class="count">${rows.length}건</span><button class="add" data-newtx="1">＋ 기록</button></header>${allocationRecordScope==='review'?'<button class="addbtn" data-alloc="all-records">전체 기록 보기</button>':''}
+ <section class="card" id="alloc-records"><header><h2>${allocationRecordScope==='review'?'항목 미지정':'전체 기록'}</h2><span class="count">${rows.length}건</span><button class="add" data-newtx="1">＋ 추가</button></header>${allocationRecordScope==='review'?'<button class="addbtn" data-alloc="all-records">전체 기록 보기</button>':''}
  ${rows.length?rows.map((r,i)=>`${!i||r.date!==rows[i-1].date?`<div class="daygrp"><span>${md(r.date)}</span></div>`:''}${txRow(r)}`).join(''):'<div class="empty">아직 기록이 없어요.</div>'}</section>`;
 };
 let allocationForm=null;
@@ -85,7 +85,7 @@ function allocationOptions(kind,group){
 function allocationRenderForm(){
  const f=allocationForm,options=allocationOptions(f.kind,f.group);
  const sourceItems=allocationOptions('transfer');
- openSheet(`<h2>${f.id?'기록 수정':'가계부 기록'}</h2><p class="err" id="err"></p>
+ openSheet(`<h2>${f.id?'기록 수정':'가계부 추가'}</h2><p class="err" id="err"></p>
  <div class="alloc-kind">${[['income','수입'],['expense','소비'],['saving','저축·투자'],['transfer','이체']].map(([id,name])=>`<button data-alloc="form-kind" data-kind="${id}" class="${f.kind===id?'on':''}">${name}</button>`).join('')}</div>
  <div class="field"><label for="alloc-amount">금액</label><input class="amt" id="alloc-amount" type="number" inputmode="numeric" min="1" step="1" value="${f.amount||''}" placeholder="0"></div>
  ${f.kind==='expense'?`<div class="field"><label for="alloc-group">구역</label><select id="alloc-group">${['fixed','living','reserve'].map(g=>`<option value="${g}" ${f.group===g?'selected':''}>${ALLOC_GROUPS[g].name}${g==='reserve'?'에서 실제 소비':''}</option>`).join('')}</select></div>`:''}
